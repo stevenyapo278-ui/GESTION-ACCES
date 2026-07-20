@@ -43,7 +43,7 @@ services:
       MINIO_SECRET_KEY: minioadmin123
       MINIO_BUCKET: gestions-access-uploads
       PORT: 3001
-      CORS_ORIGIN: http://localhost:5173
+      CORS_ORIGIN: http://localhost:8888
     ports:
       - "3001:3001"
     depends_on:
@@ -57,9 +57,9 @@ services:
       dockerfile: Dockerfile
     container_name: gestions_access_ui
     environment:
-      VITE_API_URL: http://localhost:3001/api
+      VITE_API_URL: http://localhost:8888/api
     ports:
-      - "5173:80"
+      - "8888:80"
     depends_on:
       - backend
     restart: unless-stopped
