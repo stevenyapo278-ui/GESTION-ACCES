@@ -11,5 +11,8 @@ SQL
 echo "Running Prisma db push..."
 npx prisma db push --accept-data-loss
 
+echo "Running seed..."
+npx prisma db seed
+
 echo "Starting server..."
 node dist/index.js
