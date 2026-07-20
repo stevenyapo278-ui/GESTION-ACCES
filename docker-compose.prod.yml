@@ -60,6 +60,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: ${PROJECT_NAME:-gestions_access}_ui
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
     depends_on:
       - backend
     restart: unless-stopped
