@@ -92,6 +92,7 @@ export interface CellValue {
   columnId: string;
   value: any;
   userId?: string;
+  assigneeId?: string;
   fileUrl?: string;
 }
 

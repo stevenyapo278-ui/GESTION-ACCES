@@ -141,19 +141,20 @@ model Row {
 }
 
 model CellValue {
-  id        String   @id @default(uuid())
-  rowId     String
-  columnId  String
-  value     Json?
-  userId    String?
-  fileUrl   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  rowId      String
+  columnId   String
+  value      Json?
+  userId     String?
+  assigneeId String?
+  fileUrl    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  row       Row     @relation(fields: [rowId], references: [id], onDelete: Cascade)
-  column    Column  @relation(fields: [columnId], references: [id], onDelete: Cascade)
-  owner     User?   @relation("UserCellValue", fields: [userId], references: [id], map: "fk_cell_value_owner")
-  assignee  User?   @relation("AssigneeCellValue", fields: [userId], references: [id], map: "fk_cell_value_assignee")
+  row      Row    @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  column   Column @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  owner    User?  @relation("UserCellValue", fields: [userId], references: [id])
+  assignee User?  @relation("AssigneeCellValue", fields: [assigneeId], references: [id])
 
   @@unique([rowId, columnId])
   @@map("cell_values")

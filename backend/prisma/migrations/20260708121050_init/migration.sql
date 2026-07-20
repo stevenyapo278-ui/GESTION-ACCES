@@ -79,6 +79,7 @@ CREATE TABLE "cell_values" (
     "columnId" TEXT NOT NULL,
     "value" JSONB,
     "userId" TEXT,
+    "assigneeId" TEXT,
     "fileUrl" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -200,10 +201,10 @@ ALTER TABLE "cell_values" ADD CONSTRAINT "cell_values_rowId_fkey" FOREIGN KEY ("
 ALTER TABLE "cell_values" ADD CONSTRAINT "cell_values_columnId_fkey" FOREIGN KEY ("columnId") REFERENCES "columns"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cell_values" ADD CONSTRAINT "fk_cell_value_owner" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "cell_values" ADD CONSTRAINT "cell_values_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cell_values" ADD CONSTRAINT "fk_cell_value_assignee" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "cell_values" ADD CONSTRAINT "cell_values_assigneeId_fkey" FOREIGN KEY ("assigneeId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "views" ADD CONSTRAINT "views_tableId_fkey" FOREIGN KEY ("tableId") REFERENCES "tables"("id") ON DELETE CASCADE ON UPDATE CASCADE;
