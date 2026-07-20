@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  READER
+}
+
+enum ColumnType {
+  TEXT
+  LONG_TEXT
+  NUMBER
+  DECIMAL
+  CURRENCY
+  PERCENTAGE
+  DATE
+  TIME
+  DATE_TIME
+  CHECKBOX
+  YES_NO
+  DROPDOWN
+  MULTI_SELECT
+  USER
+  EMAIL
+  PHONE
+  URL
+  IMAGE
+  FILE
+  SIGNATURE
+  LOCATION
+  FORMULA
+  AUTO_CALC
+}
+
+enum ViewType {
+  TABLE
+  CARDS
+  CALENDAR
+  KANBAN
+  GALLERY
+}
+
+enum PermissionLevel {
+  READ
+  CREATE
+  UPDATE
+  DELETE
+  SHARE
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      Role     @default(EDITOR)
+  avatar    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdTables  Table[]
+  createdColumns Column[]
+  createdRows    Row[]
+  createdViews   View[]
+  permissions    Permission[]
+  auditLogs      AuditLog[]
+  cellValues     CellValue[] @relation("UserCellValue")
+  assignedValues CellValue[] @relation("AssigneeCellValue")
+
+  @@map("users")
+}
+
+model Table {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  icon        String   @default("table")
+  color       String   @default("#3B82F6")
+  category    String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator     User       @relation(fields: [createdBy], references: [id])
+  columns     Column[]
+  rows        Row[]
+  views       View[]
+  permissions Permission[]
+  auditLogs   AuditLog[]
+  forms       Form[]
+
+  @@map("tables")
+}
+
+model Column {
+  id          String     @id @default(uuid())
+  tableId     String
+  name        String
+  type        ColumnType
+  required    Boolean    @default(false)
+  unique      Boolean    @default(false)
+  order       Int
+  options     Json?
+  formula     String?
+  settings    Json?
+  createdBy   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  table          Table         @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  cellValues     CellValue[]
+  viewColumns    ViewColumn[]
+  filterColumns  Filter[]
+  createdByUser  User          @relation(fields: [createdBy], references: [id])
+
+  @@map("columns")
+}
+
+model Row {
+  id        String   @id @default(uuid())
+  tableId   String
+  order     Int      @default(0)
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  table          Table       @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  cellValues     CellValue[]
+  createdByUser  User        @relation(fields: [createdBy], references: [id])
+
+  @@map("rows")
+}
+
+model CellValue {
+  id        String   @id @default(uuid())
+  rowId     String
+  columnId  String
+  value     Json?
+  userId    String?
+  fileUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  row       Row     @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  column    Column  @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  owner     User?   @relation("UserCellValue", fields: [userId], references: [id], map: "fk_cell_value_owner")
+  assignee  User?   @relation("AssigneeCellValue", fields: [userId], references: [id], map: "fk_cell_value_assignee")
+
+  @@unique([rowId, columnId])
+  @@map("cell_values")
+}
+
+model View {
+  id        String   @id @default(uuid())
+  tableId   String
+  name      String
+  type      ViewType @default(TABLE)
+  settings  Json?
+  isDefault Boolean  @default(false)
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  table         Table         @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  createdByUser User          @relation(fields: [createdBy], references: [id])
+  viewColumns   ViewColumn[]
+  filters       Filter[]
+
+  @@map("views")
+}
+
+model ViewColumn {
+  id        String  @id @default(uuid())
+  viewId    String
+  columnId  String
+  order     Int
+  visible   Boolean @default(true)
+  width     Int?    @default(200)
+
+  view   View   @relation(fields: [viewId], references: [id], onDelete: Cascade)
+  column Column @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@unique([viewId, columnId])
+  @@map("view_columns")
+}
+
+model Filter {
+  id        String @id @default(uuid())
+  viewId    String
+  columnId  String
+  operator  String
+  value     Json?
+  order     Int
+
+  view   View   @relation(fields: [viewId], references: [id], onDelete: Cascade)
+  column Column @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@map("filters")
+}
+
+model Permission {
+  id        String           @id @default(uuid())
+  tableId   String
+  userId    String
+  level     PermissionLevel  @default(READ)
+  createdAt DateTime         @default(now())
+
+  table Table @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tableId, userId, level])
+  @@map("permissions")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tableId   String
+  userId    String
+  action    String
+  entity    String
+  entityId  String?
+  changes   Json?
+  createdAt DateTime @default(now())
+
+  table Table @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model Attachment {
+  id          String   @id @default(uuid())
+  tableId     String
+  rowId       String?
+  columnId    String?
+  fileName    String
+  fileUrl     String
+  fileSize    Int
+  mimeType    String
+  uploadedBy  String
+  createdAt   DateTime @default(now())
+
+  @@map("attachments")
+}
+
+model Form {
+  id              String   @id @default(uuid())
+  tableId         String
+  name            String
+  description     String?
+  publicToken     String   @unique @default(uuid())
+  isActive        Boolean  @default(true)
+  submitLabel     String   @default("Soumettre")
+  successMessage  String   @default("Votre réponse a bien été enregistrée. Merci !")
+  fields          Json     // Array of { columnId, label, required, hidden, order, helpText }
+  settings        Json?    // { bgColor, accentColor, logoUrl, headerImage, requireCaptcha, allowMultiple }
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  table       Table           @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  submissions FormSubmission[]
+
+  @@map("forms")
+}
+
+model FormSubmission {
+  id          String   @id @default(uuid())
+  formId      String
+  rowId       String?
+  submitterIp String?
+  data        Json     // Raw submitted values
+  createdAt   DateTime @default(now())
+
+  form Form @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@map("form_submissions")
+}
