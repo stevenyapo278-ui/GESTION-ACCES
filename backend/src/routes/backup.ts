@@ -87,9 +87,11 @@ async function createBackup(userId: string): Promise<any> {
   const tableCount = data.tables.length;
   const rowCount = data.tables.reduce((sum, t) => sum + t.rows.length, 0);
 
+  const jsonData = JSON.stringify(data);
   const backup = await prisma.backup.create({
     data: {
       name: generateBackupName(),
+      fileSize: Buffer.byteLength(jsonData, 'utf8'),
       tableCount,
       rowCount,
       data: data as any,

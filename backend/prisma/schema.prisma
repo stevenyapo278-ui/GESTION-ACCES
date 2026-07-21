@@ -292,7 +292,7 @@ model Backup {
   id          String   @id @default(uuid())
   name        String
   description String?
-  fileSize    BigInt   @default(0)
+  fileSize    Int      @default(0)
   tableCount  Int      @default(0)
   rowCount    Int      @default(0)
   data        Json
