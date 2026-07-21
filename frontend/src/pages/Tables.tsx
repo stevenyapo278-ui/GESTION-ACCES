@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Table2, Trash2, Settings, MoreHorizontal, FileText, Loader2 } from 'lucide-react';
+import { Plus, Search, Table2, Trash2, Settings, Copy, FileText, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { tablesAPI } from '../services/api';
 import type { Table } from '../types';
@@ -34,6 +34,15 @@ export default function Tables() {
       toast.error('Échec de la suppression');
     }
   };
+
+  const duplicateMutation = useMutation({
+    mutationFn: (id: string) => tablesAPI.duplicate(id),
+    onSuccess: (res) => {
+      toast.success('Tableau dupliqué');
+      refetch();
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Erreur'),
+  });
 
   const seedMutation = useMutation({
     mutationFn: () => tablesAPI.seedAccessTemplate(),
@@ -118,10 +127,17 @@ export default function Tables() {
                 )}
               </Link>
               <div className="px-5 py-2 border-t flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity" style={{ borderColor: 'var(--border-color)' }}>
-                <Link to={`/tables/${table.id}/settings`} className="text-xs text-zinc-500 hover:text-accent-blue flex items-center gap-1">
-                  <Settings className="size-3" />
-                  Paramètres
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link to={`/tables/${table.id}/settings`} className="text-xs text-zinc-500 hover:text-accent-blue flex items-center gap-1">
+                    <Settings className="size-3" />
+                    Paramètres
+                  </Link>
+                  <button onClick={() => duplicateMutation.mutate(table.id)} disabled={duplicateMutation.isPending}
+                    className="text-xs text-zinc-500 hover:text-accent-green flex items-center gap-1">
+                    <Copy className="size-3" />
+                    Dupliquer
+                  </button>
+                </div>
                 <button onClick={() => handleDelete(table.id, table.name)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
                   <Trash2 className="size-3" />
                   Supprimer

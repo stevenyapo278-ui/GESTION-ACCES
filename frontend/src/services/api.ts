@@ -54,6 +54,7 @@ export const tablesAPI = {
     api.post('/tables', data),
   update: (id: string, data: any) => api.put(`/tables/${id}`, data),
   delete: (id: string) => api.delete(`/tables/${id}`),
+  duplicate: (id: string) => api.post(`/tables/${id}/duplicate`),
   seedAccessTemplate: () => api.post('/tables/seed-access-template'),
 };
 

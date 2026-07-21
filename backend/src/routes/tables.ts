@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import prisma from '../lib/prisma';
 import { Router, Response } from 'express';
 
@@ -193,6 +194,158 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Delete table error:', error);
     res.status(500).json({ error: 'Failed to delete table' });
+  }
+});
+
+// POST /api/tables/:id/duplicate — Duplicate a table with all columns, rows, views
+router.post('/:id/duplicate', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const source = await prisma.table.findUnique({
+      where: { id: req.params.id },
+      include: {
+        columns: { orderBy: { order: 'asc' } },
+        rows: {
+          orderBy: { order: 'asc' },
+          include: { cellValues: true },
+        },
+        views: {
+          include: {
+            viewColumns: true,
+            filters: { orderBy: { order: 'asc' } },
+          },
+        },
+      },
+    });
+
+    if (!source) {
+      res.status(404).json({ error: 'Table not found' });
+      return;
+    }
+
+    const userId = req.user!.id;
+
+    const newTableId = uuidv4();
+    const colIdMap: Record<string, string> = {};
+
+    await prisma.table.create({
+      data: {
+        id: newTableId,
+        name: `Copie de ${source.name}`,
+        description: source.description,
+        icon: source.icon,
+        color: source.color,
+        category: source.category,
+        createdBy: userId,
+      },
+    });
+
+    for (const col of source.columns) {
+      const newId = uuidv4();
+      colIdMap[col.id] = newId;
+      await prisma.column.create({
+        data: {
+          id: newId,
+          tableId: newTableId,
+          name: col.name,
+          type: col.type,
+          required: col.required,
+          unique: col.unique,
+          order: col.order,
+          options: col.options || undefined,
+          formula: col.formula || undefined,
+          settings: col.settings || undefined,
+          createdBy: userId,
+        },
+      });
+    }
+
+    for (const row of source.rows) {
+      const newRowId = uuidv4();
+      await prisma.row.create({
+        data: {
+          id: newRowId,
+          tableId: newTableId,
+          order: row.order,
+          createdBy: userId,
+        },
+      });
+
+      for (const cv of row.cellValues) {
+        const mappedColId = colIdMap[cv.columnId];
+        if (!mappedColId) continue;
+        await prisma.cellValue.create({
+          data: {
+            rowId: newRowId,
+            columnId: mappedColId,
+            value: cv.value !== undefined ? cv.value as any : null,
+            userId: null,
+            assigneeId: null,
+            fileUrl: cv.fileUrl || null,
+          },
+        });
+      }
+    }
+
+    for (const view of source.views) {
+      const newViewId = uuidv4();
+      await prisma.view.create({
+        data: {
+          id: newViewId,
+          tableId: newTableId,
+          name: view.name,
+          type: view.type,
+          settings: view.settings || undefined,
+          isDefault: view.isDefault,
+          createdBy: userId,
+        },
+      });
+
+      if (view.viewColumns) {
+        for (const vc of view.viewColumns) {
+          const mappedColId = colIdMap[vc.columnId];
+          if (!mappedColId) continue;
+          await prisma.viewColumn.create({
+            data: {
+              viewId: newViewId,
+              columnId: mappedColId,
+              order: vc.order,
+              visible: vc.visible,
+              width: vc.width || 200,
+            },
+          });
+        }
+      }
+
+      if (view.filters) {
+        for (const f of view.filters) {
+          const mappedColId = colIdMap[f.columnId];
+          if (!mappedColId) continue;
+          await prisma.filter.create({
+            data: {
+              viewId: newViewId,
+              columnId: mappedColId,
+              operator: f.operator,
+              value: f.value !== undefined ? f.value as any : null,
+              order: f.order,
+            },
+          });
+        }
+      }
+    }
+
+    const created = await prisma.table.findUnique({
+      where: { id: newTableId },
+      include: {
+        columns: { orderBy: { order: 'asc' } },
+        _count: { select: { columns: true, rows: true } },
+        creator: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+    });
+
+    res.status(201).json(created);
+  } catch (error) {
+    console.error('Duplicate table error:', error);
+    res.status(500).json({ error: 'Failed to duplicate table' });
   }
 });
 
