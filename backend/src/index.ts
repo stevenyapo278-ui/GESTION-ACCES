@@ -14,6 +14,7 @@ import userRoutes from './routes/users';
 import formRoutes from './routes/forms';
 import prisma from './lib/prisma';
 import backupRoutes, { runAutoBackup } from './routes/backup';
+import documentRoutes from './routes/documents';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -40,6 +41,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/forms', formRoutes);
 app.use('/api/backups', backupRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

@@ -186,6 +186,20 @@ export const COLUMN_TYPES: ColumnTypeMeta[] = [
 ];
 
 // === Dashboard Stats ===
+export interface Document {
+  id: string;
+  title: string;
+  description?: string;
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  isActive?: boolean;
+  order?: number;
+  createdAt: string;
+  creator?: Pick<User, 'id' | 'firstName' | 'lastName' | 'email'>;
+}
+
 export interface DashboardStats {
   totalTables: number;
   totalRows: number;

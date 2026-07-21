@@ -216,3 +216,15 @@ export const publicFormAPI = {
     axios.post(`/api/forms/public/${token}/submit`, { data }),
 };
 
+// === Documents API ===
+export const documentsAPI = {
+  list: () => axios.get('/api/documents'),
+  listAdmin: () => api.get('/documents/admin'),
+  create: (data: FormData) =>
+    api.post('/documents', data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  update: (id: string, data: any) => api.put(`/documents/${id}`, data),
+  delete: (id: string) => api.delete(`/documents/${id}`),
+};
+

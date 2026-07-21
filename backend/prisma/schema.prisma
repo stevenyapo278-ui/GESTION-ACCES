@@ -77,6 +77,7 @@ model User {
   assignedValues CellValue[] @relation("AssigneeCellValue")
   backups        Backup[]
   backupSettings BackupSettings?
+  documents      Document[]
 
   @@map("users")
 }
@@ -321,4 +322,24 @@ model BackupSettings {
   creator User @relation(fields: [createdBy], references: [id])
 
   @@map("backup_settings")
+}
+
+model Document {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  fileUrl     String
+  objectKey   String
+  fileName    String
+  fileSize    Int      @default(0)
+  mimeType    String   @default("application/pdf")
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator User @relation(fields: [createdBy], references: [id])
+
+  @@map("documents")
 }

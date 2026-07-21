@@ -9,6 +9,7 @@ import {
   Sun,
   ChevronLeft,
   HardDrive,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -22,6 +23,7 @@ const navItems = [
 
 const adminItems = [
   { to: '/users', icon: Users, label: 'Utilisateurs' },
+  { to: '/documents', icon: FileText, label: 'Documents' },
 ];
 
 export default function Sidebar({

@@ -12,6 +12,8 @@ import FormBuilder from './pages/FormBuilder';
 import PublicForm from './pages/PublicForm';
 import FormSubmissions from './pages/FormSubmissions';
 import Backups from './pages/Backups';
+import Landing from './pages/Landing';
+import Documents from './pages/Documents';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -80,9 +82,11 @@ export default function App() {
         <Route path="tables/:tableId/forms/new" element={<FormBuilder />} />
         <Route path="tables/:tableId/forms/:formId" element={<FormBuilder />} />
         <Route path="tables/:tableId/forms/:formId/submissions" element={<FormSubmissions />} />
+        <Route path="documents" element={<Documents />} />
       </Route>
-      {/* Public form route — no auth */}
+      {/* Public routes — no auth */}
       <Route path="/forms/:token" element={<PublicForm />} />
+      <Route path="/telechargements" element={<Landing />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
