@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Database, Eye, EyeOff, Loader2, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
@@ -130,22 +129,7 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="text-center text-sm text-zinc-500 mt-6">
-            Pas encore de compte ?{' '}
-            <Link to="/register" className="text-accent-blue hover:underline font-medium">
-              S'inscrire
-            </Link>
-          </p>
 
-          {/* Demo credentials */}
-          <div className={`mt-8 p-4 rounded-xl border ${isDark ? 'bg-space-900 border-space-700' : 'bg-slate-50 border-zinc-200'}`}>
-            <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Comptes de démo</p>
-            <div className="space-y-1.5 mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              <p><span className="font-medium" style={{ color: 'var(--text-primary)' }}>Admin :</span> admin@example.com / admin123</p>
-              <p><span className="font-medium" style={{ color: 'var(--text-primary)' }}>Éditeur :</span> editor@example.com / editor123</p>
-              <p><span className="font-medium" style={{ color: 'var(--text-primary)' }}>Lecteur :</span> reader@example.com / reader123</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
