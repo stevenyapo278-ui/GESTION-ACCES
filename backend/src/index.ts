@@ -12,6 +12,7 @@ import importRoutes from './routes/import';
 import analyticsRoutes from './routes/analytics';
 import userRoutes from './routes/users';
 import formRoutes from './routes/forms';
+import backupRoutes, { runAutoBackup } from './routes/backup';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -37,6 +38,7 @@ app.use('/api/import', importRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/forms', formRoutes);
+app.use('/api/backups', backupRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -55,6 +57,14 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📋 API base: http://localhost:${PORT}/api`);
+  console.log(`⏰ Auto-backup scheduled every 24 hours`);
+
+  // Schedule automatic backups every 24 hours
+  const AUTO_BACKUP_INTERVAL = 24 * 60 * 60 * 1000;
+  setTimeout(() => {
+    runAutoBackup();
+    setInterval(runAutoBackup, AUTO_BACKUP_INTERVAL);
+  }, 60_000);
 });
 
 export default app;

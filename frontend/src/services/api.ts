@@ -195,6 +195,16 @@ export const formsAPI = {
   submissions: (id: string) => api.get(`/forms/${id}/submissions`),
 };
 
+// === Backups API ===
+export const backupAPI = {
+  list: () => api.get('/backups'),
+  get: (id: string) => api.get(`/backups/${id}`),
+  create: () => api.post('/backups'),
+  download: (id: string, name: string) =>
+    downloadFile(`/api/backups/${id}/download`, `${name}.json`),
+  delete: (id: string) => api.delete(`/backups/${id}`),
+};
+
 // === Public Form API (no auth) ===
 export const publicFormAPI = {
   get: (token: string) => axios.get(`/api/forms/public/${token}`),

@@ -75,6 +75,7 @@ model User {
   auditLogs      AuditLog[]
   cellValues     CellValue[] @relation("UserCellValue")
   assignedValues CellValue[] @relation("AssigneeCellValue")
+  backups        Backup[]
 
   @@map("users")
 }
@@ -285,4 +286,20 @@ model FormSubmission {
   form Form @relation(fields: [formId], references: [id], onDelete: Cascade)
 
   @@map("form_submissions")
+}
+
+model Backup {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  fileSize    BigInt   @default(0)
+  tableCount  Int      @default(0)
+  rowCount    Int      @default(0)
+  data        Json
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  creator User @relation(fields: [createdBy], references: [id])
+
+  @@map("backups")
 }

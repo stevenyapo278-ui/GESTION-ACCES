@@ -11,6 +11,7 @@ import Users from './pages/Users';
 import FormBuilder from './pages/FormBuilder';
 import PublicForm from './pages/PublicForm';
 import FormSubmissions from './pages/FormSubmissions';
+import Backups from './pages/Backups';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="tables/:id" element={<TableView />} />
         <Route path="tables/:id/settings" element={<TableBuilder />} />
         <Route path="users" element={<Users />} />
+        <Route path="backups" element={<Backups />} />
         <Route path="tables/:tableId/forms/new" element={<FormBuilder />} />
         <Route path="tables/:tableId/forms/:formId" element={<FormBuilder />} />
         <Route path="tables/:tableId/forms/:formId/submissions" element={<FormSubmissions />} />

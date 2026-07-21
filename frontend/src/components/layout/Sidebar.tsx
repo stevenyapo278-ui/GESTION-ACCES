@@ -8,6 +8,7 @@ import {
   Moon,
   Sun,
   ChevronLeft,
+  HardDrive,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -16,6 +17,7 @@ import clsx from 'clsx';
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Tableau de bord', end: true },
   { to: '/tables', icon: Table2, label: 'Tableaux', end: true },
+  { to: '/backups', icon: HardDrive, label: 'Sauvegardes', end: true },
 ];
 
 const adminItems = [
