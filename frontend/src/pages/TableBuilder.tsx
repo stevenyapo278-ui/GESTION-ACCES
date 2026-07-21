@@ -51,6 +51,8 @@ export default function TableBuilder() {
   const [confirmClose, setConfirmClose] = useState(false);
   const [confirmRemoveCol, setConfirmRemoveCol] = useState<number | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [optionsInputs, setOptionsInputs] = useState<Record<number, string>>({});
+  const [modalOptionsInput, setModalOptionsInput] = useState('');
 
   useEffect(() => {
     if (!isEditing || !id) return;
@@ -97,6 +99,7 @@ export default function TableBuilder() {
     initialColumnRef.current = empty;
     setEditingIndex(null);
     setNewColumn(empty);
+    setModalOptionsInput('');
     setShowModal(true);
   };
 
@@ -105,6 +108,7 @@ export default function TableBuilder() {
     initialColumnRef.current = col;
     setEditingIndex(index);
     setNewColumn(col);
+    setModalOptionsInput(col.options.join(', '));
     setShowModal(true);
   };
 
@@ -113,7 +117,8 @@ export default function TableBuilder() {
       toast.error('Le nom de la colonne est requis');
       return;
     }
-    const updated = { ...newColumn, name: newColumn.name.trim() };
+    const parsedOptions = modalOptionsInput.split(',').map((s) => s.trim()).filter(Boolean);
+    const updated = { ...newColumn, name: newColumn.name.trim(), options: parsedOptions };
     if (editingIndex !== null) {
       setColumns(columns.map((col, i) => (i === editingIndex ? updated : col)));
     } else {
@@ -277,11 +282,25 @@ export default function TableBuilder() {
                     {IconComponent && <IconComponent className="size-4 text-zinc-400" />}
                   </div>
                   <input className="input flex-1" placeholder="Nom de la colonne" value={col.name} onChange={(e) => updateColumn(index, { name: e.target.value })} />
-                  <select className="input w-44" value={col.type} onChange={(e) => updateColumn(index, { type: e.target.value as ColumnType })}>
+                  <select className="input w-44" value={col.type} onChange={(e) => {
+                    const newType = e.target.value as ColumnType;
+                    updateColumn(index, { type: newType });
+                    const isOldChoice = col.type === 'DROPDOWN' || col.type === 'MULTI_SELECT';
+                    const isNewChoice = newType === 'DROPDOWN' || newType === 'MULTI_SELECT';
+                    if (isOldChoice && !isNewChoice) {
+                      setOptionsInputs((prev) => { const next = { ...prev }; delete next[index]; return next; });
+                    }
+                  }}>
                     {COLUMN_TYPES.map((ct) => (<option key={ct.type} value={ct.type}>{ct.label}</option>))}
                   </select>
                   {(col.type === 'DROPDOWN' || col.type === 'MULTI_SELECT') && (
-                    <input className="input w-36" placeholder="Opt1,Opt2..." value={col.options.join(',')} onChange={(e) => updateColumn(index, { options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
+                    <input className="input w-36" placeholder="Opt1,Opt2..."
+                      value={optionsInputs[index] ?? col.options.join(', ')}
+                      onChange={(e) => setOptionsInputs((prev) => ({ ...prev, [index]: e.target.value }))}
+                      onBlur={(e) => {
+                        const opts = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                        updateColumn(index, { options: opts });
+                      }} />
                   )}
                   <button onClick={() => updateColumn(index, { required: !col.required })}
                     className={`text-xs px-2 py-1 rounded-lg border transition-colors whitespace-nowrap ${col.required ? 'bg-accent-orange/10 border-accent-orange/30 text-accent-orange' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
@@ -350,8 +369,8 @@ export default function TableBuilder() {
                 <div>
                   <label className="label">Options (séparées par des virgules)</label>
                   <input className="input" placeholder="Option 1, Option 2, Option 3..."
-                    value={newColumn.options.join(', ')}
-                    onChange={(e) => setNewColumn({ ...newColumn, options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
+                    value={modalOptionsInput}
+                    onChange={(e) => setModalOptionsInput(e.target.value)} />
                 </div>
               )}
 
