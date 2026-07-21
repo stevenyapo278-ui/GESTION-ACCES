@@ -203,6 +203,9 @@ export const backupAPI = {
   download: (id: string, name: string) =>
     downloadFile(`/api/backups/${id}/download`, `${name}.json`),
   delete: (id: string) => api.delete(`/backups/${id}`),
+  import: (data: any) => api.post('/backups/import', data),
+  getSettings: () => api.get('/backups/settings'),
+  updateSettings: (data: any) => api.put('/backups/settings', data),
 };
 
 // === Public Form API (no auth) ===

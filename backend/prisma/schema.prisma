@@ -76,6 +76,7 @@ model User {
   cellValues     CellValue[] @relation("UserCellValue")
   assignedValues CellValue[] @relation("AssigneeCellValue")
   backups        Backup[]
+  backupSettings BackupSettings?
 
   @@map("users")
 }
@@ -302,4 +303,22 @@ model Backup {
   creator User @relation(fields: [createdBy], references: [id])
 
   @@map("backups")
+}
+
+model BackupSettings {
+  id           String    @id @default(uuid())
+  enabled      Boolean   @default(true)
+  frequency    String    @default("daily")
+  frequencyValue Int     @default(24)
+  frequencyUnit  String  @default("hours")
+  retention    Int       @default(14)
+  lastBackupAt DateTime?
+  nextBackupAt DateTime?
+  createdBy    String    @unique
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  creator User @relation(fields: [createdBy], references: [id])
+
+  @@map("backup_settings")
 }

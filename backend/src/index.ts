@@ -12,6 +12,7 @@ import importRoutes from './routes/import';
 import analyticsRoutes from './routes/analytics';
 import userRoutes from './routes/users';
 import formRoutes from './routes/forms';
+import prisma from './lib/prisma';
 import backupRoutes, { runAutoBackup } from './routes/backup';
 
 const app = express();
@@ -57,14 +58,22 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📋 API base: http://localhost:${PORT}/api`);
-  console.log(`⏰ Auto-backup scheduled every 24 hours`);
+  console.log(`⏰ Auto-backup scheduler started`);
 
-  // Schedule automatic backups every 24 hours
-  const AUTO_BACKUP_INTERVAL = 24 * 60 * 60 * 1000;
-  setTimeout(() => {
-    runAutoBackup();
-    setInterval(runAutoBackup, AUTO_BACKUP_INTERVAL);
-  }, 60_000);
+  const runBackupFromSettings = async () => {
+    try {
+      const settings = await prisma.backupSettings.findFirst();
+      if (!settings || !settings.enabled || settings.frequency === 'manual') return;
+
+      const now = new Date();
+      if (settings.nextBackupAt && settings.nextBackupAt > now) return;
+
+      await runAutoBackup();
+    } catch {}
+  };
+
+  runBackupFromSettings();
+  setInterval(runBackupFromSettings, 60_000);
 });
 
 export default app;
