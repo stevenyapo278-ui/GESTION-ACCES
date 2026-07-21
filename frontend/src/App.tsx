@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import Layout from './components/layout/Layout';
 import Login from './pages/Login';
@@ -15,31 +15,34 @@ import Backups from './pages/Backups';
 import Landing from './pages/Landing';
 import Documents from './pages/Documents';
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+function Spinner() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-space-950">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold-400" />
+    </div>
+  );
+}
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
-      </div>
-    );
+function AppLayout() {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) return <Spinner />;
+
+  if (!user) {
+    if (location.pathname !== '/') {
+      return <Navigate to="/login" replace />;
+    }
+    return <Landing />;
   }
 
-  if (!user) return <Navigate to="/login" replace />;
-  return <>{children}</>;
+  return <Layout />;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
-      </div>
-    );
-  }
+  if (isLoading) return <Spinner />;
 
   if (user) return <Navigate to="/" replace />;
   return <>{children}</>;
@@ -64,14 +67,7 @@ export default function App() {
           </PublicRoute>
         }
       />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
+      <Route path="/" element={<AppLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="tables" element={<Tables />} />
         <Route path="tables/new" element={<TableBuilder />} />
@@ -84,9 +80,7 @@ export default function App() {
         <Route path="tables/:tableId/forms/:formId/submissions" element={<FormSubmissions />} />
         <Route path="documents" element={<Documents />} />
       </Route>
-      {/* Public routes — no auth */}
       <Route path="/forms/:token" element={<PublicForm />} />
-      <Route path="/telechargements" element={<Landing />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
