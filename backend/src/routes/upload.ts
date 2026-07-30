@@ -151,7 +151,7 @@ router.get('/file/:objectKey(*)', async (req: AuthRequest, res: Response) => {
     const stream = await minioClient.getObject(BUCKET, objectKey);
     const stat = await minioClient.statObject(BUCKET, objectKey);
 
-    res.setHeader('Content-Type', stat.meta?.['content-type'] || 'application/octet-stream');
+    res.setHeader('Content-Type', stat.metaData?.['content-type'] || 'application/octet-stream');
     res.setHeader('Content-Length', stat.size);
     res.setHeader('Content-Disposition', `inline; filename="${objectKey.split('/').pop()}"`);
     res.setHeader('Cache-Control', 'public, max-age=31536000');
