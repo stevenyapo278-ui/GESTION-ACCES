@@ -196,4 +196,21 @@ router.post('/batch', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/rows/:id/audit-logs — Get audit history for a specific row
+router.get('/:id/audit-logs', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const logs = await prisma.auditLog.findMany({
+      where: { entity: 'ROW', entityId: req.params.id },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+    });
+    res.json(logs);
+  } catch (error) {
+    console.error('Row audit logs error:', error);
+    res.status(500).json({ error: 'Failed to fetch audit logs' });
+  }
+});
+
 export default router;

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { publicFormAPI } from '../services/api';
+import { useFormDraft } from '../hooks/useFormDraft';
 
 interface FormField {
   columnId: string;
@@ -42,8 +43,19 @@ export default function PublicForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, any>>({});
 
+  const { save: saveDraft, restore: restoreDraft, clear: clearDraft, hasDraft, setHasDraft } = useFormDraft(token);
+  const draftRestoredRef = useRef(false);
+
   const accent = form?.settings?.accentColor || '#6366f1';
   const bg = form?.settings?.bgColor || '#f8fafc';
+
+  const handleValueChange = useCallback((columnId: string, value: any) => {
+    setValues((prev) => {
+      const next = { ...prev, [columnId]: value };
+      saveDraft(next);
+      return next;
+    });
+  }, [saveDraft]);
 
   useEffect(() => {
     if (!token) return;
@@ -51,16 +63,24 @@ export default function PublicForm() {
       .get(token)
       .then((res) => {
         setForm(res.data);
-        // Init values
         const init: Record<string, any> = {};
         (res.data.fields as FormField[]).forEach((f) => {
           if (!f.hidden) init[f.columnId] = '';
         });
-        setValues(init);
+        // Restore draft if available
+        if (!draftRestoredRef.current) {
+          const draft = restoreDraft();
+          if (draft && Object.keys(draft).length > 0) {
+            setValues(draft);
+          } else {
+            setValues(init);
+          }
+          draftRestoredRef.current = true;
+        }
       })
       .catch(() => setError('Ce formulaire est introuvable ou n\'est plus actif.'))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, restoreDraft]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +89,7 @@ export default function PublicForm() {
     setSubmitting(true);
     try {
       await publicFormAPI.submit(token, values);
+      clearDraft();
       setSubmitted(true);
     } catch (err: any) {
       setSubmitError(err?.response?.data?.error || 'Une erreur est survenue. Veuillez réessayer.');
@@ -92,7 +113,7 @@ export default function PublicForm() {
       id: `field-${field.columnId}`,
       required: field.required,
       value: values[field.columnId] ?? '',
-      onChange: (e: any) => setValues((v) => ({ ...v, [field.columnId]: e.target.value })),
+      onChange: (e: any) => handleValueChange(field.columnId, e.target.value),
       className: `${inputBase} ${focusColor}`,
       placeholder: field.helpText || '',
     };
@@ -133,9 +154,7 @@ export default function PublicForm() {
           <div className="flex items-center gap-3 mt-1">
             <button
               type="button"
-              onClick={() =>
-                setValues((v) => ({ ...v, [field.columnId]: !v[field.columnId] }))
-              }
+              onClick={() => handleValueChange(field.columnId, !values[field.columnId])}
               className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
                 values[field.columnId] ? `bg-[${accent}]` : 'bg-slate-300'
               }`}
@@ -185,7 +204,7 @@ export default function PublicForm() {
                     const next = selected
                       ? curr.filter((x: string) => x !== opt)
                       : [...curr, opt];
-                    setValues((v) => ({ ...v, [field.columnId]: next }));
+                    handleValueChange(field.columnId, next);
                   }}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
                     selected
@@ -297,6 +316,17 @@ export default function PublicForm() {
           onSubmit={handleSubmit}
           className="bg-white rounded-b-3xl shadow-2xl p-8 space-y-6"
         >
+          {hasDraft && !submitError && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+              <span>📝</span>
+              <span>Brouillon récupéré. Vous pouvez reprendre votre saisie.</span>
+              <button type="button" onClick={() => { clearDraft(); setHasDraft(false); }}
+                className="ml-auto text-xs font-medium text-amber-600 hover:text-amber-800 underline">
+                Ignorer
+              </button>
+            </div>
+          )}
+
           {visibleFields.map((field) => (
             <div key={field.columnId} className="space-y-1.5">
               <label

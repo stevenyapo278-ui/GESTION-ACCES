@@ -77,6 +77,7 @@ export const rowsAPI = {
   delete: (id: string) => api.delete(`/rows/${id}`),
   batchCreate: (data: { tableId: string; rows: { values: Record<string, any> }[] }) =>
     api.post('/rows/batch', data),
+  auditLogs: (rowId: string) => api.get(`/rows/${rowId}/audit-logs`),
 };
 
 // === Views API ===

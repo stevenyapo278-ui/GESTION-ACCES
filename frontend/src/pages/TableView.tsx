@@ -3,9 +3,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Plus, Search, Download, Upload, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown,
-  Trash2, Loader2, Check, X, FileText, Columns3, Eye,
+  Trash2, Loader2, Check, X, FileText, Columns3, Eye, GripVertical,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Table2,
 } from 'lucide-react';
+import {
+  DndContext, DragEndEvent, closestCenter,
+  PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext, useSortable, horizontalListSortingStrategy, arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   useReactTable, getCoreRowModel, getSortedRowModel, getPaginationRowModel,
   getFilteredRowModel, ColumnDef, SortingState, ColumnFiltersState,
@@ -357,6 +365,34 @@ export default function TableView() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // DnD sensors for column reorder
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const handleColumnDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !activeView || visibleColumns.length < 2) return;
+
+    const oldIdx = visibleColumns.findIndex((c) => c.id === active.id);
+    const newIdx = visibleColumns.findIndex((c) => c.id === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+
+    const reordered = arrayMove(visibleColumns, oldIdx, newIdx);
+    const payload = reordered.map((col, i) => ({
+      columnId: col.id,
+      order: i,
+      visible: true,
+      width: activeView.viewColumns?.find((vc) => vc.columnId === col.id)?.width ?? 200,
+    }));
+    try {
+      await viewsAPI.updateColumns(activeView.id, payload);
+      queryClient.invalidateQueries({ queryKey: ['table', id] });
+    } catch {
+      toast.error('Échec du réordonnancement');
+    }
+  };
+
   // Get all columns for visibility toggle
   const allColumns = table?.columns ?? [];
   const isPending = createRowMutation.isPending || updateRowMutation.isPending;
@@ -580,39 +616,44 @@ export default function TableView() {
               {tableInstance.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   <th className="w-10 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider sticky left-0 z-10" style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-tertiary)' }}>#</th>
-                  {headerGroup.headers.map((header) => (
-                    <th key={header.id} className="relative px-4 py-3 text-left cursor-pointer hover:opacity-80 select-none group"
-                      style={{ width: header.getSize(), color: 'var(--text-muted)', minWidth: header.getSize() }}
-                      onClick={header.column.getToggleSortingHandler()}>
-                      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider whitespace-nowrap overflow-hidden">
-                        <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                        {header.column.getCanSort() && (
-                          <span className="text-zinc-600 shrink-0">
-                            {header.column.getIsSorted() === 'asc' ? <ArrowUp className="size-3" /> :
-                             header.column.getIsSorted() === 'desc' ? <ArrowDown className="size-3" /> :
-                             <ArrowUpDown className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />}
-                          </span>
-                        )}
-                      </div>
-                      {/* Filter input */}
-                      <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          className="w-full px-2 py-1 text-[11px] rounded-md border outline-none transition-colors"
-                          placeholder="Filtrer..."
-                          value={(header.column.getFilterValue() as string) ?? ''}
-                          onChange={(e) => header.column.setFilterValue(e.target.value)}
-                          style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
-                        />
-                      </div>
-                      {/* Resize handle */}
-                      <div
-                        onMouseDown={header.getResizeHandler()}
-                        onTouchStart={header.getResizeHandler()}
-                        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-accent-blue/50 transition-colors opacity-0 group-hover:opacity-100"
-                        style={{ touchAction: 'none' }}
-                      />
-                    </th>
-                  ))}
+                  <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
+                    <SortableContext items={headerGroup.headers.map(h => h.id)} strategy={horizontalListSortingStrategy}>
+                      {headerGroup.headers.map((header) => (
+                        <SortableTh key={header.id} headerId={header.id}
+                          style={{ width: header.getSize(), minWidth: header.getSize() }}
+                          onClick={() => header.column.getToggleSortingHandler()}>
+                          <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider whitespace-nowrap overflow-hidden">
+                            <button className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-white/10 transition-colors text-zinc-500 hover:text-zinc-300 shrink-0" onPointerDown={(e) => e.stopPropagation()}>
+                              <GripVertical className="size-3" />
+                            </button>
+                            <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                            {header.column.getCanSort() && (
+                              <span className="text-zinc-600 shrink-0">
+                                {header.column.getIsSorted() === 'asc' ? <ArrowUp className="size-3" /> :
+                                 header.column.getIsSorted() === 'desc' ? <ArrowDown className="size-3" /> :
+                                 <ArrowUpDown className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              className="w-full px-2 py-1 text-[11px] rounded-md border outline-none transition-colors"
+                              placeholder="Filtrer..."
+                              value={(header.column.getFilterValue() as string) ?? ''}
+                              onChange={(e) => header.column.setFilterValue(e.target.value)}
+                              style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+                            />
+                          </div>
+                          <div
+                            onMouseDown={header.getResizeHandler()}
+                            onTouchStart={header.getResizeHandler()}
+                            className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-accent-blue/50 transition-colors opacity-0 group-hover:opacity-100"
+                            style={{ touchAction: 'none' }}
+                          />
+                        </SortableTh>
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                   <th className="w-16 px-4 py-3" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
                 </tr>
               ))}
@@ -881,6 +922,25 @@ export default function TableView() {
         onCancel={() => setConfirmDeleteRow(null)}
       />
     </div>
+  );
+}
+
+// === Sortable <th> for column drag-and-drop ===
+function SortableTh({ headerId, style, onClick, children }: { headerId: string; style: React.CSSProperties; onClick: () => void; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: headerId });
+  const mergedStyle: React.CSSProperties = {
+    ...style,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    cursor: isDragging ? 'grabbing' : 'pointer',
+    position: 'relative',
+  };
+  return (
+    <th ref={setNodeRef} className="px-4 py-3 text-left select-none group" style={{ ...mergedStyle, color: 'var(--text-muted)' }}
+      onClick={onClick} {...attributes} {...listeners}>
+      {children}
+    </th>
   );
 }
 

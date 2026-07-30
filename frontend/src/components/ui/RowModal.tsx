@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  X, Loader2, Check, Trash2,
+  X, Loader2, Check, Trash2, History, FileText,
 } from 'lucide-react';
-import type { Column, Row } from '../../types';
+import { rowsAPI } from '../../services/api';
+import type { Column, Row, AuditLog } from '../../types';
 
 interface RowModalProps {
   open: boolean;
@@ -22,11 +23,29 @@ export default function RowModal({
   open, mode, columns, row, values,
   onValuesChange, onSave, onDelete, onClose, isPending, isDeleting,
 }: RowModalProps) {
+  const [tab, setTab] = useState<'form' | 'history'>('form');
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     if (open) document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) { setTab('form'); setAuditLogs([]); }
+  }, [open]);
+
+  useEffect(() => {
+    if (tab === 'history' && mode === 'edit' && row && auditLogs.length === 0 && !loadingLogs) {
+      setLoadingLogs(true);
+      rowsAPI.auditLogs(row.id)
+        .then((res) => setAuditLogs(res.data as AuditLog[]))
+        .catch(() => {})
+        .finally(() => setLoadingLogs(false));
+    }
+  }, [tab, mode, row, auditLogs.length, loadingLogs]);
 
   if (!open) return null;
 
@@ -185,22 +204,69 @@ export default function RowModal({
               </span>
             )}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors">
-            <X className="size-5" style={{ color: 'var(--text-muted)' }} />
-          </button>
+          <div className="flex items-center gap-2">
+            {mode === 'edit' && (
+              <div className="flex items-center rounded-lg border overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                <button onClick={() => setTab('form')}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${tab === 'form' ? 'bg-accent-blue/10 text-accent-blue' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                  <FileText className="size-3.5 inline mr-1" />Saisie
+                </button>
+                <button onClick={() => setTab('history')}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${tab === 'history' ? 'bg-accent-blue/10 text-accent-blue' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                  <History className="size-3.5 inline mr-1" />Historique
+                </button>
+              </div>
+            )}
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors">
+              <X className="size-5" style={{ color: 'var(--text-muted)' }} />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          {columns.map((col) => (
-            <div key={col.id}>
-              <label className="label">
-                {col.name}
-                {col.required && <span className="text-red-400 ml-0.5">*</span>}
-              </label>
-              {renderField(col)}
-            </div>
-          ))}
+          {tab === 'history' ? (
+            loadingLogs ? (
+              <div className="flex justify-center py-8"><Loader2 className="size-6 animate-spin text-zinc-500" /></div>
+            ) : auditLogs.length === 0 ? (
+              <p className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>Aucun historique pour cette ligne</p>
+            ) : (
+              <div className="space-y-3">
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="flex gap-3 p-3 rounded-lg" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                    <div className="shrink-0 mt-0.5">
+                      <span className={`size-2 block rounded-full ${log.action === 'CREATE' ? 'bg-accent-green' : log.action === 'UPDATE' ? 'bg-accent-blue' : 'bg-red-400'}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-primary)' }}>
+                        <span className="font-medium">{log.user?.firstName} {log.user?.lastName}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium uppercase ${
+                          log.action === 'CREATE' ? 'bg-accent-green/10 text-accent-green' :
+                          log.action === 'UPDATE' ? 'bg-accent-blue/10 text-accent-blue' :
+                          'bg-red-400/10 text-red-400'
+                        }`}>
+                          {log.action === 'CREATE' ? 'Création' : log.action === 'UPDATE' ? 'Modification' : 'Suppression'}
+                        </span>
+                      </div>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {new Date(log.createdAt).toLocaleString('fr-FR')}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : (
+            columns.map((col) => (
+              <div key={col.id}>
+                <label className="label">
+                  {col.name}
+                  {col.required && <span className="text-red-400 ml-0.5">*</span>}
+                </label>
+                {renderField(col)}
+              </div>
+            ))
+          )}
         </div>
 
         {/* Footer */}
