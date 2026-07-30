@@ -36,16 +36,16 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     // Use raw SQL to search inside the JSONB `value` column
     // The value is stored as JSONB; we cast to text and do a case-insensitive search
-    const rowIds: { row_id: string }[] = await prisma.$queryRawUnsafe(`
-      SELECT DISTINCT cv.row_id
+    const rowIds: { rowId: string }[] = await prisma.$queryRawUnsafe(`
+      SELECT DISTINCT cv."rowId"
       FROM cell_values cv
-      WHERE cv.column_id = ANY($1)
+      WHERE cv."columnId" = ANY($1)
         AND cv.value IS NOT NULL
         AND LOWER(cv.value::text) LIKE $2
       LIMIT 200
     `, textColumnIds, `%${searchTerm.toLowerCase()}%`);
 
-    const foundRowIds = rowIds.map((r) => r.row_id);
+    const foundRowIds = rowIds.map((r) => r.rowId);
 
     // Also search in table names/descriptions
     const matchingTables = await prisma.table.findMany({
@@ -110,12 +110,12 @@ router.post('/advanced', authenticate, async (req: AuthRequest, res: Response) =
       switch (operator) {
         case 'eq': {
           params.push(value ?? '');
-          conditions.push(`(cv.column_id = ${colParam} AND cv.value::text = $${params.length})`);
+          conditions.push(`(cv."columnId" = ${colParam} AND cv.value::text = $${params.length})`);
           break;
         }
         case 'neq': {
           params.push(value ?? '');
-          conditions.push(`(cv.column_id = ${colParam} AND cv.value::text != $${params.length})`);
+          conditions.push(`(cv."columnId" = ${colParam} AND cv.value::text != $${params.length})`);
           break;
         }
         case 'gt':
@@ -124,26 +124,25 @@ router.post('/advanced', authenticate, async (req: AuthRequest, res: Response) =
         case 'lte': {
           const op = operator === 'gt' ? '>' : operator === 'gte' ? '>=' : operator === 'lt' ? '<' : '<=';
           params.push(value ?? 0);
-          // #>> '{}' gets the JSON primitive as text; cast it to numeric
-          conditions.push(`(cv.column_id = ${colParam} AND (cv.value #>> '{}')::numeric ${op} $${params.length})`);
+          conditions.push(`(cv."columnId" = ${colParam} AND (cv.value #>> '{}')::numeric ${op} $${params.length})`);
           break;
         }
         case 'contains': {
           params.push(`%${String(value ?? '').toLowerCase()}%`);
-          conditions.push(`(cv.column_id = ${colParam} AND LOWER(cv.value::text) LIKE $${params.length})`);
+          conditions.push(`(cv."columnId" = ${colParam} AND LOWER(cv.value::text) LIKE $${params.length})`);
           break;
         }
         case 'isEmpty': {
-          conditions.push(`(cv.column_id = ${colParam} AND (cv.value IS NULL OR cv.value::text = '""' OR cv.value::text = 'null'))`);
+          conditions.push(`(cv."columnId" = ${colParam} AND (cv.value IS NULL OR cv.value::text = '""' OR cv.value::text = 'null'))`);
           break;
         }
         case 'isNotEmpty': {
-          conditions.push(`(cv.column_id = ${colParam} AND cv.value IS NOT NULL AND cv.value::text != '""' AND cv.value::text != 'null')`);
+          conditions.push(`(cv."columnId" = ${colParam} AND cv.value IS NOT NULL AND cv.value::text != '""' AND cv.value::text != 'null')`);
           break;
         }
         default: {
           params.push(value ?? '');
-          conditions.push(`(cv.column_id = ${colParam} AND cv.value::text = $${params.length})`);
+          conditions.push(`(cv."columnId" = ${colParam} AND cv.value::text = $${params.length})`);
         }
       }
     }
@@ -154,17 +153,17 @@ router.post('/advanced', authenticate, async (req: AuthRequest, res: Response) =
 
     const whereClause = conditions.join(' AND ');
 
-    const rowIds: { row_id: string }[] = await prisma.$queryRawUnsafe(`
-      SELECT cv.row_id
+    const rowIds: { rowId: string }[] = await prisma.$queryRawUnsafe(`
+      SELECT cv."rowId"
       FROM cell_values cv
-      INNER JOIN rows r ON r.id = cv.row_id AND r.table_id = $1
+      INNER JOIN rows r ON r.id = cv."rowId" AND r."tableId" = $1
       WHERE ${whereClause}
-      GROUP BY cv.row_id
+      GROUP BY cv."rowId"
       HAVING COUNT(*) = ${countParam}
       LIMIT 200
     `, ...params);
 
-    const foundRowIds = rowIds.map((r) => r.row_id);
+    const foundRowIds = rowIds.map((r) => r.rowId);
 
     const rows = await prisma.row.findMany({
       where: { id: { in: foundRowIds }, tableId },

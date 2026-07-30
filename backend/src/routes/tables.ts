@@ -29,10 +29,10 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       let dataTableIds: string[] = [];
       try {
         const tableIdsFromData: { table_id: string }[] = await prisma.$queryRawUnsafe(
-          `SELECT DISTINCT r.table_id FROM cell_values cv JOIN rows r ON r.id = cv.row_id WHERE cv.value IS NOT NULL AND LOWER(cv.value::text) LIKE $1 LIMIT 500`,
+          `SELECT DISTINCT r."tableId" FROM cell_values cv JOIN rows r ON r.id = cv."rowId" WHERE cv.value IS NOT NULL AND LOWER(cv.value::text) LIKE $1 LIMIT 500`,
           `%${searchTerm.toLowerCase()}%`
         );
-        dataTableIds = tableIdsFromData.map((r: any) => r.table_id);
+        dataTableIds = tableIdsFromData.map((r: any) => r.tableId);
       } catch (err) {
         console.error('Cell value search failed (non-blocking):', err);
       }
