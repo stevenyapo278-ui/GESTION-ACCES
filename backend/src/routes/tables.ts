@@ -23,7 +23,40 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     }
 
     if (search) {
-      where.name = { contains: search as string, mode: 'insensitive' };
+      const searchTerm = search as string;
+
+      // Search in cell values via raw SQL (case-insensitive, across all column types)
+      const tableIdsFromData: { table_id: string }[] = await prisma.$queryRawUnsafe(`
+        SELECT DISTINCT r.table_id
+        FROM cell_values cv
+        JOIN rows r ON r.id = cv.row_id
+        WHERE cv.value IS NOT NULL
+          AND LOWER(cv.value::text) LIKE $1
+        LIMIT 500
+      `, `%${searchTerm.toLowerCase()}%`);
+
+      const dataTableIds = tableIdsFromData.map(r => r.table_id);
+
+      const searchConditions: any[] = [
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+      if (dataTableIds.length > 0) {
+        searchConditions.push({ id: { in: dataTableIds } });
+      }
+
+      const permissionConditions = (user.role !== 'ADMIN')
+        ? [{ createdBy: user.id }, { permissions: { some: { userId: user.id } } }]
+        : [];
+
+      where.AND = [
+        ...(permissionConditions.length > 0 ? [{ OR: permissionConditions }] : []),
+        { OR: searchConditions },
+      ];
+    } else if (user.role !== 'ADMIN') {
+      where.OR = [
+        { createdBy: user.id },
+        { permissions: { some: { userId: user.id } } },
+      ];
     }
 
     if (category) {

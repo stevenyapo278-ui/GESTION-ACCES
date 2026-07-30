@@ -79,7 +79,7 @@ export default function Tables() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-500" />
         <input
           className="input pl-10"
-          placeholder="Rechercher un tableau..."
+          placeholder="Rechercher dans les noms et données..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
