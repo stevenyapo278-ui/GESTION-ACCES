@@ -133,6 +133,8 @@ model Row {
   tableId   String
   order     Int      @default(0)
   createdBy String
+  comment   String?
+  color     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import {
-  Plus, GripVertical, ArrowLeft, Loader2, Check, X, PenLine,
+  Plus, GripVertical, ArrowLeft, Loader2, Check, X, PenLine, Palette,
   Type, AlignLeft, Hash, Divide, DollarSign, Percent,
   Calendar, Clock, CalendarClock, CheckSquare, ToggleLeft,
   ChevronDown, Tags, User, Mail, Phone, Link,
@@ -411,6 +411,23 @@ export default function TableBuilder() {
                   </div>
                 </div>
               )}
+
+              <div>
+                <label className="label"><Palette className="size-3.5 inline mr-1" />Couleur de la colonne</label>
+                <div className="flex flex-wrap gap-2">
+                  {['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#78716c'].map((c) => (
+                    <button
+                      key={c || 'none'}
+                      type="button"
+                      onClick={() => setNewColumn({ ...newColumn, settings: { ...newColumn.settings, color: c } })}
+                      className={`size-8 rounded-full border-2 transition-all ${(newColumn.settings?.color || '') === c ? 'border-white scale-110' : 'border-transparent'} ${c ? '' : 'bg-zinc-700 flex items-center justify-center'}`}
+                      title={c || 'Aucune'}
+                    >
+                      {c ? <span className="size-full rounded-full block" style={{ backgroundColor: c }} /> : <X className="size-3 text-zinc-400" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="flex items-center gap-3 pt-2">
                 <span className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Champ obligatoire</span>

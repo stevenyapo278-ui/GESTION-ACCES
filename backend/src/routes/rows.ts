@@ -10,7 +10,7 @@ const router = Router();
 // POST /api/rows — Create a row with cell values
 router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { tableId, values } = req.body; // values: { [columnId]: value }
+    const { tableId, values, comment, color } = req.body; // values: { [columnId]: value }
 
     if (!tableId) {
       res.status(400).json({ error: 'tableId is required' });
@@ -36,6 +36,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
         tableId,
         order: (lastRow?.order ?? -1) + 1,
         createdBy: req.user!.id,
+        ...(comment !== undefined && { comment }),
+        ...(color !== undefined && { color }),
         cellValues: {
           create: Object.entries(values || {}).map(([columnId, value]) => ({
             columnId,
@@ -65,7 +67,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 // PUT /api/rows/:id — Update a row (and its cell values)
 router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { values } = req.body;
+    const { values, comment, color } = req.body;
     const row = await prisma.row.findUnique({
       where: { id: req.params.id },
       include: { cellValues: true, table: { include: { columns: true } } },
@@ -83,6 +85,17 @@ router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
         res.status(400).json({ error: validationError });
         return;
       }
+    }
+
+    // Update row-level fields (comment, color)
+    if (comment !== undefined || color !== undefined) {
+      await prisma.row.update({
+        where: { id: row.id },
+        data: {
+          ...(comment !== undefined && { comment }),
+          ...(color !== undefined && { color }),
+        },
+      });
     }
 
     // Update or create cell values

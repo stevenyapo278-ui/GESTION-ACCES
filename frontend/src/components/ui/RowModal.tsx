@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import {
-  X, Loader2, Check, Trash2, History, FileText, Upload, Image,
+  X, Loader2, Check, Trash2, History, FileText, Upload, Image, Palette, MessageSquare,
 } from 'lucide-react';
 import { rowsAPI, uploadAPI } from '../../services/api';
 import type { Column, Row, AuditLog } from '../../types';
@@ -14,6 +14,10 @@ interface RowModalProps {
   row: Row | null;
   values: Record<string, any>;
   onValuesChange: (values: Record<string, any>) => void;
+  comment?: string;
+  color?: string;
+  onCommentChange?: (comment: string) => void;
+  onColorChange?: (color: string) => void;
   onSave: () => void;
   onDelete: () => void;
   onClose: () => void;
@@ -23,7 +27,9 @@ interface RowModalProps {
 
 export default function RowModal({
   open, mode, tableId: id, columns, row, values,
-  onValuesChange, onSave, onDelete, onClose, isPending, isDeleting,
+  onValuesChange, comment: externalComment, color: externalColor,
+  onCommentChange, onColorChange,
+  onSave, onDelete, onClose, isPending, isDeleting,
 }: RowModalProps) {
   const [tab, setTab] = useState<'form' | 'history'>('form');
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -342,15 +348,48 @@ export default function RowModal({
               </div>
             )
           ) : (
-            columns.map((col) => (
-              <div key={col.id}>
-                <label className="label">
-                  {col.name}
-                  {col.required && <span className="text-red-400 ml-0.5">*</span>}
-                </label>
-                {renderField(col)}
+            <>
+              {columns.map((col) => (
+                <div key={col.id}>
+                  <label className="label">
+                    {col.name}
+                    {col.required && <span className="text-red-400 ml-0.5">*</span>}
+                  </label>
+                  {renderField(col)}
+                </div>
+              ))}
+
+              <hr className="border-t my-4" style={{ borderColor: 'var(--border-color)' }} />
+
+              {/* Commentaire */}
+              <div>
+                <label className="label"><MessageSquare className="size-3.5 inline mr-1" />Commentaire</label>
+                <textarea
+                  className="input min-h-[60px] resize-y"
+                  placeholder="Ajouter un commentaire sur cette ligne..."
+                  value={externalComment ?? ''}
+                  onChange={(e) => onCommentChange?.(e.target.value)}
+                />
               </div>
-            ))
+
+              {/* Couleur de la ligne */}
+              <div>
+                <label className="label"><Palette className="size-3.5 inline mr-1" />Couleur de la ligne</label>
+                <div className="flex flex-wrap gap-2">
+                  {['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#78716c'].map((c) => (
+                    <button
+                      key={c || 'none'}
+                      type="button"
+                      onClick={() => onColorChange?.(c)}
+                      className={`size-8 rounded-full border-2 transition-all ${(externalColor || '') === c ? 'border-white scale-110' : 'border-transparent'} ${c ? '' : 'bg-zinc-700 flex items-center justify-center'}`}
+                      title={c || 'Aucune'}
+                    >
+                      {c ? <span className="size-full rounded-full block" style={{ backgroundColor: c }} /> : <X className="size-3 text-zinc-400" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
         </div>
 

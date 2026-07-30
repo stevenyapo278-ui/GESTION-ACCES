@@ -70,9 +70,9 @@ export const columnsAPI = {
 
 // === Rows API ===
 export const rowsAPI = {
-  create: (data: { tableId: string; values: Record<string, any> }) =>
+  create: (data: { tableId: string; values: Record<string, any>; comment?: string; color?: string }) =>
     api.post('/rows', data),
-  update: (id: string, data: { values: Record<string, any> }) =>
+  update: (id: string, data: { values?: Record<string, any>; comment?: string; color?: string }) =>
     api.put(`/rows/${id}`, data),
   delete: (id: string) => api.delete(`/rows/${id}`),
   batchCreate: (data: { tableId: string; rows: { values: Record<string, any> }[] }) =>

@@ -80,6 +80,8 @@ export interface Row {
   tableId: string;
   order: number;
   createdBy: string;
+  comment?: string;
+  color?: string;
   createdAt: string;
   updatedAt: string;
   cellValues: CellValue[];

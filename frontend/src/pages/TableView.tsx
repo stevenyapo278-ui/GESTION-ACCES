@@ -48,6 +48,8 @@ export default function TableView() {
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
   const [modalRow, setModalRow] = useState<Row | null>(null);
   const [modalValues, setModalValues] = useState<Record<string, any>>({});
+  const [modalComment, setModalComment] = useState('');
+  const [modalColor, setModalColor] = useState('');
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [newColName, setNewColName] = useState('');
   const [newColType, setNewColType] = useState<ColumnType>('TEXT');
@@ -101,13 +103,13 @@ export default function TableView() {
 
   // Mutations
   const createRowMutation = useMutation({
-    mutationFn: (values: Record<string, any>) => rowsAPI.create({ tableId: id!, values }),
+    mutationFn: ({ values, comment, color }: { values: Record<string, any>; comment?: string; color?: string }) => rowsAPI.create({ tableId: id!, values, comment, color }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['table', id], exact: false }); toast.success('Ligne ajoutée'); closeModal(); },
     onError: (err: any) => toast.error(err.response?.data?.error || 'Erreur'),
   });
 
   const updateRowMutation = useMutation({
-    mutationFn: ({ rowId, values }: { rowId: string; values: Record<string, any> }) => rowsAPI.update(rowId, { values }),
+    mutationFn: ({ rowId, values, comment, color }: { rowId: string; values: Record<string, any>; comment?: string; color?: string }) => rowsAPI.update(rowId, { values, comment, color }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['table', id], exact: false }); toast.success('Ligne mise à jour'); closeModal(); },
     onError: (err: any) => toast.error(err.response?.data?.error || 'Erreur'),
   });
@@ -181,6 +183,8 @@ export default function TableView() {
     table?.columns?.forEach((col) => { initial[col.id] = ''; });
     setModalValues(initial);
     setModalRow(null);
+    setModalComment('');
+    setModalColor('');
     setModalMode('create');
   };
 
@@ -189,6 +193,8 @@ export default function TableView() {
     row.cellValues.forEach((cv) => { values[cv.columnId] = cv.value; });
     setModalValues(values);
     setModalRow(row);
+    setModalComment(row.comment || '');
+    setModalColor(row.color || '');
     setModalMode('edit');
   };
 
@@ -196,6 +202,8 @@ export default function TableView() {
     setModalMode(null);
     setModalRow(null);
     setModalValues({});
+    setModalComment('');
+    setModalColor('');
   };
 
   const handleSave = () => {
@@ -267,9 +275,9 @@ export default function TableView() {
     }
 
     if (modalMode === 'create') {
-      createRowMutation.mutate(modalValues);
+      createRowMutation.mutate({ values: modalValues, comment: modalComment || undefined, color: modalColor || undefined });
     } else if (modalMode === 'edit' && modalRow) {
-      updateRowMutation.mutate({ rowId: modalRow.id, values: modalValues });
+      updateRowMutation.mutate({ rowId: modalRow.id, values: modalValues, comment: modalComment || undefined, color: modalColor || undefined });
     }
   };
 
@@ -618,8 +626,10 @@ export default function TableView() {
                   <th className="w-10 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider sticky left-0 z-10" style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-tertiary)' }}>#</th>
                   <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
                     <SortableContext items={headerGroup.headers.map(h => h.id)} strategy={horizontalListSortingStrategy}>
-                      {headerGroup.headers.map((header) => (
-                        <SortableTh key={header.id} headerId={header.id}
+                      {headerGroup.headers.map((header) => {
+                        const colMeta = visibleColumns.find((c) => c.id === header.id);
+                        return (
+                        <SortableTh key={header.id} headerId={header.id} columnColor={colMeta?.settings?.color}
                           style={{ width: header.getSize(), minWidth: header.getSize() }}
                           onClick={() => header.column.getToggleSortingHandler()}>
                           <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider whitespace-nowrap overflow-hidden">
@@ -651,7 +661,8 @@ export default function TableView() {
                             style={{ touchAction: 'none' }}
                           />
                         </SortableTh>
-                      ))}
+                      );
+                    })}
                     </SortableContext>
                   </DndContext>
                   <th className="w-16 px-4 py-3" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
@@ -687,15 +698,18 @@ export default function TableView() {
               ) : (
                 tableInstance.getRowModel().rows.map((row, idx) => (
                   <tr key={row.id}
-                    className="border-b transition-colors cursor-pointer hover:bg-white/[0.03]"
-                    style={{ borderColor: 'var(--border-color)' }}
+                    className="border-b transition-colors cursor-pointer hover:brightness-110"
+                    style={{ borderColor: 'var(--border-color)', backgroundColor: row.original.color || undefined }}
                     onClick={() => openEditModal(row.original)}>
-                    <td className="px-4 py-2.5 text-xs sticky left-0 z-[1]" style={{ color: 'var(--text-muted)', backgroundColor: idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-card-hover)' }}>{pageIndex * pageSize + idx + 1}</td>
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-2.5 text-sm" style={{ width: cell.column.getSize(), color: 'var(--text-secondary)' }}>
+                    <td className="px-4 py-2.5 text-xs sticky left-0 z-[1]" style={{ color: 'var(--text-muted)', backgroundColor: row.original.color || (idx % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-card-hover)') }}>{pageIndex * pageSize + idx + 1}</td>
+                    {row.getVisibleCells().map((cell) => {
+                      const colMeta = visibleColumns.find((c) => c.id === cell.column.id);
+                      return (
+                      <td key={cell.id} className="px-4 py-2.5 text-sm" style={{ width: cell.column.getSize(), color: 'var(--text-secondary)', ...(colMeta?.settings?.color ? { backgroundColor: colMeta.settings.color + '10' } : {}) }}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
-                    ))}
+                      );
+                    })}
                     <td className="px-4 py-2.5">
                       <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteRow(row.original.id); }}
                         className="p-1.5 text-red-400 hover:bg-red-500/10 rounded transition-colors" title="Supprimer">
@@ -898,6 +912,10 @@ export default function TableView() {
         row={modalRow}
         values={modalValues}
         onValuesChange={setModalValues}
+        comment={modalComment}
+        color={modalColor}
+        onCommentChange={setModalComment}
+        onColorChange={setModalColor}
         onSave={handleSave}
         onDelete={handleDelete}
         onClose={closeModal}
@@ -927,7 +945,7 @@ export default function TableView() {
 }
 
 // === Sortable <th> for column drag-and-drop ===
-function SortableTh({ headerId, style, onClick, children }: { headerId: string; style: React.CSSProperties; onClick: () => void; children: React.ReactNode }) {
+function SortableTh({ headerId, style, onClick, children, columnColor }: { headerId: string; style: React.CSSProperties; onClick: () => void; children: React.ReactNode; columnColor?: string }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: headerId });
   const mergedStyle: React.CSSProperties = {
     ...style,
@@ -936,6 +954,7 @@ function SortableTh({ headerId, style, onClick, children }: { headerId: string; 
     opacity: isDragging ? 0.4 : 1,
     cursor: isDragging ? 'grabbing' : 'pointer',
     position: 'relative',
+    ...(columnColor ? { backgroundColor: columnColor + '20', borderLeft: `3px solid ${columnColor}` } : {}),
   };
   return (
     <th ref={setNodeRef} className="px-4 py-3 text-left select-none group" style={{ ...mergedStyle, color: 'var(--text-muted)' }}
