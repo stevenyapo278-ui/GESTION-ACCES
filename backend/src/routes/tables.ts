@@ -25,17 +25,17 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     if (search) {
       const searchTerm = search as string;
 
-      // Search in cell values via raw SQL (case-insensitive, across all column types)
-      const tableIdsFromData: { table_id: string }[] = await prisma.$queryRawUnsafe(`
-        SELECT DISTINCT r.table_id
-        FROM cell_values cv
-        JOIN rows r ON r.id = cv.row_id
-        WHERE cv.value IS NOT NULL
-          AND LOWER(cv.value::text) LIKE $1
-        LIMIT 500
-      `, `%${searchTerm.toLowerCase()}%`);
-
-      const dataTableIds = tableIdsFromData.map(r => r.table_id);
+      // Try to find tables whose cell values contain the search term
+      let dataTableIds: string[] = [];
+      try {
+        const tableIdsFromData: { table_id: string }[] = await prisma.$queryRawUnsafe(
+          `SELECT DISTINCT r.table_id FROM cell_values cv JOIN rows r ON r.id = cv.row_id WHERE cv.value IS NOT NULL AND LOWER(cv.value::text) LIKE $1 LIMIT 500`,
+          `%${searchTerm.toLowerCase()}%`
+        );
+        dataTableIds = tableIdsFromData.map((r: any) => r.table_id);
+      } catch (err) {
+        console.error('Cell value search failed (non-blocking):', err);
+      }
 
       const searchConditions: any[] = [
         { name: { contains: searchTerm, mode: 'insensitive' } },
@@ -44,14 +44,19 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
         searchConditions.push({ id: { in: dataTableIds } });
       }
 
-      const permissionConditions = (user.role !== 'ADMIN')
-        ? [{ createdBy: user.id }, { permissions: { some: { userId: user.id } } }]
-        : [];
-
-      where.AND = [
-        ...(permissionConditions.length > 0 ? [{ OR: permissionConditions }] : []),
-        { OR: searchConditions },
-      ];
+      if (user.role !== 'ADMIN') {
+        where.AND = [
+          {
+            OR: [
+              { createdBy: user.id },
+              { permissions: { some: { userId: user.id } } },
+            ],
+          },
+          { OR: searchConditions },
+        ];
+      } else {
+        where.OR = searchConditions;
+      }
     } else if (user.role !== 'ADMIN') {
       where.OR = [
         { createdBy: user.id },
