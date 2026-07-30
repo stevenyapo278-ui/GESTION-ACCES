@@ -60,7 +60,7 @@ export const tablesAPI = {
 
 // === Columns API ===
 export const columnsAPI = {
-  create: (data: { tableId: string; name: string; type: string; required?: boolean; options?: string[]; formula?: string }) =>
+  create: (data: { tableId: string; name: string; type: string; required?: boolean; options?: string[]; formula?: string; settings?: Record<string, any> }) =>
     api.post('/columns', data),
   update: (id: string, data: any) => api.put(`/columns/${id}`, data),
   delete: (id: string) => api.delete(`/columns/${id}`),
@@ -173,6 +173,17 @@ export const uploadAPI = {
     const formData = new FormData();
     files.forEach((f) => formData.append('files', f));
     return api.post('/upload/multiple', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  column: (file: File, tableId: string, columnId: string, rowId?: string, desiredName?: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('tableId', tableId);
+    formData.append('columnId', columnId);
+    if (rowId) formData.append('rowId', rowId);
+    if (desiredName) formData.append('desiredName', desiredName);
+    return api.post('/upload/column', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },

@@ -25,11 +25,12 @@ interface ColumnForm {
   type: ColumnType;
   required: boolean;
   options: string[];
+  settings?: Record<string, any>;
   existingId?: string;
 }
 
 const emptyColumnForm = (): ColumnForm => ({
-  name: '', type: 'TEXT' as ColumnType, required: false, options: [],
+  name: '', type: 'TEXT' as ColumnType, required: false, options: [], settings: {},
 });
 
 export default function TableBuilder() {
@@ -68,7 +69,9 @@ export default function TableBuilder() {
           setColumns(
             table.columns.sort((a, b) => a.order - b.order).map((col: Column) => ({
               name: col.name, type: col.type, required: col.required,
-              options: (col.options as string[]) || [], existingId: col.id,
+              options: (col.options as string[]) || [],
+              settings: (col.settings as Record<string, any>) || {},
+              existingId: col.id,
             }))
           );
         }
@@ -104,7 +107,7 @@ export default function TableBuilder() {
   };
 
   const openEditModal = (index: number) => {
-    const col = { ...columns[index] };
+    const col = { ...columns[index], settings: { ...(columns[index].settings || {}) } };
     initialColumnRef.current = col;
     setEditingIndex(index);
     setNewColumn(col);
@@ -118,7 +121,9 @@ export default function TableBuilder() {
       return;
     }
     const parsedOptions = modalOptionsInput.split(',').map((s) => s.trim()).filter(Boolean);
-    const updated = { ...newColumn, name: newColumn.name.trim(), options: parsedOptions };
+    const colSettings = newColumn.settings || {};
+    if (newColumn.type !== 'FILE') { delete colSettings.nameColumns; }
+    const updated = { ...newColumn, name: newColumn.name.trim(), options: parsedOptions, settings: colSettings };
     if (editingIndex !== null) {
       setColumns(columns.map((col, i) => (i === editingIndex ? updated : col)));
     } else {
@@ -162,9 +167,9 @@ export default function TableBuilder() {
           const col = columns[i];
           if (!col.name.trim()) continue;
           if (col.existingId) {
-            await columnsAPI.update(col.existingId, { name: col.name, type: col.type, required: col.required, options: col.options.length > 0 ? col.options : undefined, order: i });
+            await columnsAPI.update(col.existingId, { name: col.name, type: col.type, required: col.required, options: col.options.length > 0 ? col.options : undefined, order: i, settings: col.settings && Object.keys(col.settings).length > 0 ? col.settings : undefined });
           } else {
-            await columnsAPI.create({ tableId: id!, name: col.name, type: col.type, required: col.required, options: col.options.length > 0 ? col.options : undefined });
+            await columnsAPI.create({ tableId: id!, name: col.name, type: col.type, required: col.required, options: col.options.length > 0 ? col.options : undefined, settings: col.settings && Object.keys(col.settings).length > 0 ? col.settings : undefined });
           }
         }
         toast.success('Tableau mis à jour');
@@ -175,7 +180,7 @@ export default function TableBuilder() {
         for (let i = 0; i < columns.length; i++) {
           const col = columns[i];
           if (col.name.trim()) {
-            await columnsAPI.create({ tableId, name: col.name, type: col.type, required: col.required, options: col.options.length > 0 ? col.options : undefined });
+            await columnsAPI.create({ tableId, name: col.name, type: col.type, required: col.required, options: col.options.length > 0 ? col.options : undefined, settings: col.settings && Object.keys(col.settings).length > 0 ? col.settings : undefined });
           }
         }
         toast.success('Tableau créé avec succès');
@@ -371,6 +376,39 @@ export default function TableBuilder() {
                   <input className="input" placeholder="Option 1, Option 2, Option 3..."
                     value={modalOptionsInput}
                     onChange={(e) => setModalOptionsInput(e.target.value)} />
+                </div>
+              )}
+              {newColumn.type === 'FILE' && (
+                <div>
+                  <label className="label">Nommer les fichiers avec les colonnes</label>
+                  <p className="text-xs text-zinc-500 mb-2">Les fichiers uploadés seront renommés avec la concaténation des colonnes sélectionnées.</p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {columns
+                      .filter((c) => c.existingId !== newColumn.existingId && c.name.trim())
+                      .map((c) => {
+                        const selected: string[] = (newColumn.settings?.nameColumns as string[]) || [];
+                        const isSelected = selected.includes(c.existingId || c.name);
+                        return (
+                          <label key={c.existingId || c.name} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="rounded border-zinc-600"
+                              checked={isSelected}
+                              onChange={() => {
+                                const next = isSelected
+                                  ? selected.filter((id) => id !== (c.existingId || c.name))
+                                  : [...selected, c.existingId || c.name];
+                                setNewColumn({ ...newColumn, settings: { ...newColumn.settings, nameColumns: next } });
+                              }}
+                            />
+                            <span className="text-sm">{c.name}</span>
+                          </label>
+                        );
+                      })}
+                    {columns.filter((c) => c.existingId !== newColumn.existingId && c.name.trim()).length === 0 && (
+                      <p className="text-xs text-zinc-500 italic">Ajoutez d'autres colonnes pour sélectionner le nom du fichier.</p>
+                    )}
+                  </div>
                 </div>
               )}
 

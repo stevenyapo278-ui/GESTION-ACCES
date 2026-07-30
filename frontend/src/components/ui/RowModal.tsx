@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
-  X, Loader2, Check, Trash2, History, FileText,
+  X, Loader2, Check, Trash2, History, FileText, Upload, Image,
 } from 'lucide-react';
-import { rowsAPI } from '../../services/api';
+import { rowsAPI, uploadAPI } from '../../services/api';
 import type { Column, Row, AuditLog } from '../../types';
+import toast from 'react-hot-toast';
 
 interface RowModalProps {
   open: boolean;
   mode: 'create' | 'edit' | null;
+  tableId: string;
   columns: Column[];
   row: Row | null;
   values: Record<string, any>;
@@ -20,12 +22,15 @@ interface RowModalProps {
 }
 
 export default function RowModal({
-  open, mode, columns, row, values,
+  open, mode, tableId: id, columns, row, values,
   onValuesChange, onSave, onDelete, onClose, isPending, isDeleting,
 }: RowModalProps) {
   const [tab, setTab] = useState<'form' | 'history'>('form');
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [uploadingCol, setUploadingCol] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingUploadCol = useRef<string | null>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -46,6 +51,47 @@ export default function RowModal({
         .finally(() => setLoadingLogs(false));
     }
   }, [tab, mode, row, auditLogs.length, loadingLogs]);
+
+  const computeFileName = (colId: string): string | null => {
+    const col = columns.find((c) => c.id === colId);
+    const nameColIds: string[] = col?.settings?.nameColumns;
+    if (!nameColIds || nameColIds.length === 0) return null;
+    const parts = nameColIds.map((ncId) => {
+      const v = values[ncId];
+      return v != null && v !== '' ? String(v).trim() : '';
+    }).filter(Boolean);
+    return parts.length > 0 ? parts.join('_') : null;
+  };
+
+  const handleFileUpload = async () => {
+    const colId = pendingUploadCol.current;
+    const fileInput = fileInputRef.current;
+    const file = fileInput?.files?.[0];
+    if (!file || !id || !colId) return;
+    setUploadingCol(colId);
+    try {
+      const desiredName = computeFileName(colId);
+      const res = await uploadAPI.column(file, id, colId, row?.id, desiredName || undefined);
+      onValuesChange({ ...values, [colId]: res.data.fileUrl });
+      if (fileInput) fileInput.value = '';
+    } catch {
+      toast.error("Échec de l'upload");
+    } finally {
+      setUploadingCol(null);
+      pendingUploadCol.current = null;
+    }
+  };
+
+  const triggerFilePicker = (colId: string) => {
+    pendingUploadCol.current = colId;
+    fileInputRef.current?.click();
+  };
+
+  useEffect(() => {
+    if (pendingUploadCol.current && fileInputRef.current?.files?.length) {
+      handleFileUpload();
+    }
+  });
 
   if (!open) return null;
 
@@ -168,6 +214,45 @@ export default function RowModal({
             value={val}
             onChange={(e) => onValuesChange({ ...values, [col.id]: e.target.value })}
           />
+        );
+      case 'IMAGE':
+        return (
+          <div className="space-y-2">
+            {val ? (
+              <div className="relative inline-block">
+                <img src={String(val)} alt="" className="h-24 rounded-lg object-cover border" style={{ borderColor: 'var(--border-color)' }} />
+                <button onClick={() => onValuesChange({ ...values, [col.id]: '' })}
+                  className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-red-500 text-white flex items-center justify-center text-xs">×</button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => triggerFilePicker(col.id)} disabled={uploadingCol === col.id}
+                className="btn-secondary btn-sm">
+                {uploadingCol === col.id ? <Loader2 className="size-4 animate-spin" /> : <Image className="size-4" />}
+                Choisir une image
+              </button>
+            )}
+          </div>
+        );
+      case 'FILE':
+        return (
+          <div className="space-y-2">
+            {val ? (
+              <div className="flex items-center gap-2 p-2 rounded-lg" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                <FileText className="size-5 text-accent-blue shrink-0" />
+                <a href={String(val)} target="_blank" rel="noopener noreferrer" className="text-sm text-accent-blue hover:underline truncate flex-1">
+                  {String(val).split('/').pop()}
+                </a>
+                <button onClick={() => onValuesChange({ ...values, [col.id]: '' })}
+                  className="size-5 rounded-full bg-red-500 text-white flex items-center justify-center text-xs shrink-0">×</button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => triggerFilePicker(col.id)} disabled={uploadingCol === col.id}
+                className="btn-secondary btn-sm">
+                {uploadingCol === col.id ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                Uploader un fichier
+              </button>
+            )}
+          </div>
         );
       default:
         return (
@@ -299,6 +384,10 @@ export default function RowModal({
             </button>
           </div>
         </div>
+
+        <input ref={fileInputRef} type="file" className="hidden" onChange={() => {
+          if (pendingUploadCol.current) handleFileUpload();
+        }} />
       </div>
     </div>
   );

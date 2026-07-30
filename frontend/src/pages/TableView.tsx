@@ -893,6 +893,7 @@ export default function TableView() {
       <RowModal
         open={!!modalMode}
         mode={modalMode}
+        tableId={id!}
         columns={table.columns ?? []}
         row={modalRow}
         values={modalValues}
@@ -987,6 +988,18 @@ function CellRenderer({ column, value }: { column: Column; value: any }) {
     }
     case 'IMAGE':
       return value ? <img src={String(value)} alt="" className="size-10 rounded-lg object-cover border border-space-700" /> : null;
+    case 'FILE': {
+      if (!value) return null;
+      const fileName = String(value).split('/').pop() || 'Fichier';
+      return (
+        <a href={String(value)} target="_blank" rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-1.5 text-accent-blue hover:underline truncate max-w-[250px]">
+          <FileText className="size-4 shrink-0" />
+          <span className="truncate text-xs">{fileName}</span>
+        </a>
+      );
+    }
     case 'USER':
       return value ? <span className="badge bg-accent-blue/10 text-accent-blue">{String(value)}</span> : null;
     default:
