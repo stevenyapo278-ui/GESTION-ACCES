@@ -59,7 +59,12 @@ export default function Tables() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Tableaux</h2>
-          <p className="text-zinc-500 text-sm mt-1">{tables?.length ?? 0} tableau(x)</p>
+          <p className="text-zinc-500 text-sm mt-1">
+            {tables?.length ?? 0} tableau{tables?.length !== 1 ? 'x' : ''}
+            {tables && tables.length > 0 && (
+              <> · {tables.reduce((sum, t) => sum + (t._count?.rows ?? 0), 0).toLocaleString('fr-FR')} ligne{tables.reduce((sum, t) => sum + (t._count?.rows ?? 0), 0) !== 1 ? 's' : ''}</>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending}
