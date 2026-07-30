@@ -623,7 +623,7 @@ export default function TableView() {
                           style={{ width: header.getSize(), minWidth: header.getSize() }}
                           onClick={() => header.column.getToggleSortingHandler()}>
                           <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider whitespace-nowrap overflow-hidden">
-                            <button className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-white/10 transition-colors text-zinc-500 hover:text-zinc-300 shrink-0" onPointerDown={(e) => e.stopPropagation()}>
+                            <button className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-white/10 transition-colors text-zinc-500 hover:text-zinc-300 shrink-0">
                               <GripVertical className="size-3" />
                             </button>
                             <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
