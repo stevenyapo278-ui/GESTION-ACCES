@@ -1,14 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../lib/prisma';
 import { Router, Response } from 'express';
+import { Role } from '@prisma/client';
 
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { createAuditLog } from '../utils/audit';
 
 const router = Router();
 
 // GET /api/tables — List all tables accessible to user
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
     const { search, category } = req.query;
@@ -85,7 +86,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/tables/:id — Get table with columns, paginated rows, and views
-router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const pageSize = Math.min(500, Math.max(10, parseInt(req.query.pageSize as string) || 100));
@@ -137,7 +138,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 
 
 // POST /api/tables — Create a new table
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, icon, color, category } = req.body;
 
@@ -186,7 +187,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/tables/:id — Update a table
-router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, icon, color, category } = req.body;
     const oldTable = await prisma.table.findUnique({ where: { id: req.params.id } });
@@ -218,7 +219,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/tables/:id — Delete a table (cascades)
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const table = await prisma.table.findUnique({ where: { id: req.params.id } });
     if (!table) {
@@ -236,7 +237,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/tables/:id/duplicate — Duplicate a table with all columns, rows, views
-router.post('/:id/duplicate', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/duplicate', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const source = await prisma.table.findUnique({
       where: { id: req.params.id },
@@ -388,7 +389,7 @@ router.post('/:id/duplicate', authenticate, async (req: AuthRequest, res: Respon
 });
 
 // POST /api/tables/seed-access-template — Crée le template 'Demande d'accès'
-router.post('/seed-access-template', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/seed-access-template', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
 

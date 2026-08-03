@@ -1,14 +1,15 @@
 import prisma from '../lib/prisma';
 import { Router, Response } from 'express';
+import { Role } from '@prisma/client';
 
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { createAuditLog } from '../utils/audit';
 import { validateRowValues } from '../utils/validateCellValue';
 
 const router = Router();
 
 // POST /api/rows — Create a row with cell values
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId, values, comment, color } = req.body; // values: { [columnId]: value }
 
@@ -65,7 +66,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/rows/:id — Update a row (and its cell values)
-router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { values, comment, color } = req.body;
     const row = await prisma.row.findUnique({
@@ -137,7 +138,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/rows/:id — Delete a row
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const row = await prisma.row.findUnique({ where: { id: req.params.id } });
     if (!row) {
@@ -164,7 +165,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/rows/batch — Batch create rows
-router.post('/batch', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/batch', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId, rows } = req.body; // rows: [{ values: {} }]
 
@@ -210,7 +211,7 @@ router.post('/batch', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/rows/:id/audit-logs — Get audit history for a specific row
-router.get('/:id/audit-logs', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:id/audit-logs', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const logs = await prisma.auditLog.findMany({
       where: { entity: 'ROW', entityId: req.params.id },

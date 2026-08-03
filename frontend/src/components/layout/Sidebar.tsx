@@ -45,6 +45,9 @@ export default function Sidebar({
   const { user, logout, isAdmin } = useAuth();
   const { theme, toggleTheme, isDark } = useTheme();
 
+  // Non-ADMIN users only get access to the requests page
+  const visibleNavItems = isAdmin ? navItems : navItems.filter((item) => item.to === '/requests');
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Logo */}
@@ -75,7 +78,7 @@ export default function Sidebar({
 
       {/* Navigation */}
       <nav className="flex-1 min-h-0 overflow-y-auto py-4 px-2 space-y-1 scrollbar-hide">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

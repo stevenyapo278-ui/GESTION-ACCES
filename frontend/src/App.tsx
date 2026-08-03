@@ -40,6 +40,11 @@ function AppLayout() {
     return <Landing />;
   }
 
+  // Non-ADMIN users are restricted to the requests page
+  if (user.role !== 'ADMIN' && location.pathname === '/') {
+    return <Navigate to="/requests" replace />;
+  }
+
   return <Layout />;
 }
 

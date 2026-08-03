@@ -1,12 +1,13 @@
 import prisma from '../lib/prisma';
 import { Router, Response } from 'express';
+import { Role } from '@prisma/client';
 
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 // GET /api/search?tableId=xxx&q=searchTerm
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId, q } = req.query;
 
@@ -87,7 +88,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/search/advanced — Multi-criteria search with parameterized SQL
-router.post('/advanced', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/advanced', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId, filters } = req.body;
 

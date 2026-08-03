@@ -3,13 +3,14 @@ import { Router, Response } from 'express';
 
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { Role } from '@prisma/client';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // POST /api/import/:tableId/csv — Import CSV into an existing table
-router.post('/:tableId/csv', authenticate, upload.single('file'), async (req: AuthRequest, res: Response) => {
+router.post('/:tableId/csv', authenticate, authorize(Role.ADMIN), upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId } = req.params;
 
@@ -95,7 +96,7 @@ router.post('/:tableId/csv', authenticate, upload.single('file'), async (req: Au
 });
 
 // POST /api/import/create-and-import — Create table from CSV headers
-router.post('/create-and-import', authenticate, upload.single('file'), async (req: AuthRequest, res: Response) => {
+router.post('/create-and-import', authenticate, authorize(Role.ADMIN), upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'No file provided' });

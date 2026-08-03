@@ -1,12 +1,13 @@
 import prisma from '../lib/prisma';
 import { Router, Response } from 'express';
+import { Role } from '@prisma/client';
 
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 // GET /api/analytics/dashboard — Global dashboard stats
-router.get('/dashboard', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/dashboard', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const isAdmin = req.user!.role === 'ADMIN';
@@ -83,7 +84,7 @@ router.get('/dashboard', authenticate, async (req: AuthRequest, res: Response) =
 });
 
 // GET /api/analytics/table/:tableId — Table-specific stats
-router.get('/table/:tableId', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/table/:tableId', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId } = req.params;
 

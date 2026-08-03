@@ -3,12 +3,13 @@ import { Router, Response } from 'express';
 
 import { stringify } from 'csv-stringify/sync';
 import PDFDocument from 'pdfkit';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { Role } from '@prisma/client';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 // GET /api/export/:tableId/csv — Export table to CSV
-router.get('/:tableId/csv', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:tableId/csv', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId } = req.params;
 
@@ -52,7 +53,7 @@ router.get('/:tableId/csv', authenticate, async (req: AuthRequest, res: Response
 });
 
 // GET /api/export/:tableId/pdf — Export table to PDF
-router.get('/:tableId/pdf', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:tableId/pdf', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId } = req.params;
 
@@ -153,7 +154,7 @@ router.get('/:tableId/pdf', authenticate, async (req: AuthRequest, res: Response
 });
 
 // GET /api/export/:tableId/excel — Export as Excel (using CSV for simplicity)
-router.get('/:tableId/excel', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:tableId/excel', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   // For now, redirect to CSV with .xls extension (works with most spreadsheet software)
   try {
     const { tableId } = req.params;

@@ -1,13 +1,13 @@
 import prisma from '../lib/prisma';
 import { Router, Response } from 'express';
-import { PrismaClient, ViewType } from '@prisma/client';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { PrismaClient, ViewType, Role } from '@prisma/client';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { createAuditLog } from '../utils/audit';
 
 const router = Router();
 
 // POST /api/views — Create a view
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId, name, type, settings } = req.body;
 
@@ -72,7 +72,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/views/:id — Update a view
-router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { name, type, settings, isDefault } = req.body;
 
@@ -96,7 +96,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/views/:id
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     await prisma.view.delete({ where: { id: req.params.id } });
     res.json({ message: 'View deleted' });
@@ -107,7 +107,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/views/:id/columns — Update view columns visibility/order
-router.put('/:id/columns', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/:id/columns', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { columns } = req.body; // [{ columnId, order, visible, width }]
 
@@ -141,7 +141,7 @@ router.put('/:id/columns', authenticate, async (req: AuthRequest, res: Response)
 });
 
 // PUT /api/views/:id/filters — Update filters
-router.put('/:id/filters', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/:id/filters', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { filters } = req.body; // [{ columnId, operator, value, order }]
 

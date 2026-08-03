@@ -1,13 +1,13 @@
 import prisma from '../lib/prisma';
 import { Router, Response } from 'express';
-import { PrismaClient, ColumnType } from '@prisma/client';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { PrismaClient, ColumnType, Role } from '@prisma/client';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { createAuditLog } from '../utils/audit';
 
 const router = Router();
 
 // POST /api/columns — Create a column
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId, name, type, required, unique, options, formula, settings } = req.body;
 
@@ -76,7 +76,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/columns/:id — Update a column
-router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { name, type, required, unique, options, formula, settings, order } = req.body;
     const oldColumn = await prisma.column.findUnique({ where: { id: req.params.id } });
@@ -108,7 +108,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/columns/:id — Delete a column
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const column = await prisma.column.findUnique({ where: { id: req.params.id } });
     if (!column) {
@@ -126,7 +126,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/columns/reorder — Reorder columns
-router.put('/reorder/batch', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/reorder/batch', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { columns } = req.body; // Array of { id, order }
 

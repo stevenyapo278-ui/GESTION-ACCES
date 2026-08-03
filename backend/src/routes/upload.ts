@@ -3,7 +3,8 @@ import { Router, Response } from 'express';
 import multer from 'multer';
 import * as Minio from 'minio';
 import { v4 as uuidv4 } from 'uuid';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { Role } from '@prisma/client';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -29,7 +30,7 @@ async function ensureBucket(): Promise<void> {
 ensureBucket().catch(console.error);
 
 // POST /api/upload
-router.post('/', authenticate, upload.single('file'), async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, authorize(Role.ADMIN), upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'No file provided' });
@@ -58,7 +59,7 @@ router.post('/', authenticate, upload.single('file'), async (req: AuthRequest, r
 });
 
 // POST /api/upload/multiple
-router.post('/multiple', authenticate, upload.array('files', 20), async (req: AuthRequest, res: Response) => {
+router.post('/multiple', authenticate, authorize(Role.ADMIN), upload.array('files', 20), async (req: AuthRequest, res: Response) => {
   try {
     const files = req.files as Express.Multer.File[];
     if (!files || files.length === 0) {
@@ -94,7 +95,7 @@ router.post('/multiple', authenticate, upload.array('files', 20), async (req: Au
 });
 
 // POST /api/upload/column — Upload a file for a specific cell (FILE/IMAGE column)
-router.post('/column', authenticate, upload.single('file'), async (req: AuthRequest, res: Response) => {
+router.post('/column', authenticate, authorize(Role.ADMIN), upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'No file provided' });

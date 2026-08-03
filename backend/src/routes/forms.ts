@@ -1,7 +1,8 @@
 import prisma from '../lib/prisma';
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { Role } from '@prisma/client';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { createAuditLog } from '../utils/audit';
 
 const router = Router();
@@ -144,7 +145,7 @@ router.post('/public/:token/submit', publicFormLimiter, async (req: Request, res
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GET /api/forms — List forms for a table
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId } = req.query;
     if (!tableId) {
@@ -168,7 +169,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/forms/:id — Get a single form
-router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const form = await prisma.form.findUnique({
       where: { id: req.params.id },
@@ -191,7 +192,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/forms — Create a new form
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { tableId, name, description, fields, settings, submitLabel, successMessage } = req.body;
 
@@ -247,7 +248,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/forms/:id — Update a form
-router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, fields, settings, submitLabel, successMessage, isActive } = req.body;
 
@@ -278,7 +279,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/forms/:id — Delete a form
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const existing = await prisma.form.findUnique({ where: { id: req.params.id } });
     if (!existing) {
@@ -295,7 +296,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/forms/:id/regenerate-token — Regenerate the public token (invalidates old links)
-router.post('/:id/regenerate-token', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/regenerate-token', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { v4: uuidv4 } = await import('uuid');
     const form = await prisma.form.update({
@@ -310,7 +311,7 @@ router.post('/:id/regenerate-token', authenticate, async (req: AuthRequest, res:
 });
 
 // GET /api/forms/:id/submissions — List submissions for a form
-router.get('/:id/submissions', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:id/submissions', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const submissions = await prisma.formSubmission.findMany({
       where: { formId: req.params.id },
