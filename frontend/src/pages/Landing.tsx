@@ -1,16 +1,9 @@
 import { useEffect, useState } from 'react';
-import { FileText, Download, Database, ArrowRight, LogIn, ClipboardList, Send, Loader2, CheckCircle2 } from 'lucide-react';
-import { documentsAPI, publicRequestsAPI } from '../services/api';
-import type { Document } from '../types';
+import { Database, ArrowRight, LogIn, ClipboardList, Send, Loader2, CheckCircle2 } from 'lucide-react';
+import { publicRequestsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' o';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' Ko';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' Mo';
-}
 
 interface RequestType {
   id: string;
@@ -21,8 +14,6 @@ interface RequestType {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Landing() {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(true);
   const [types, setTypes] = useState<RequestType[]>([]);
   const [requestForm, setRequestForm] = useState({ typeId: '', requesterName: '', requesterEmail: '', superiorEmail: '', details: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -31,10 +22,6 @@ export default function Landing() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    documentsAPI.list()
-      .then((res) => setDocuments(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
     publicRequestsAPI.types()
       .then((res) => setTypes(res.data))
       .catch(() => {});
@@ -55,14 +42,6 @@ export default function Landing() {
       .catch((err) => toast.error(err.response?.data?.error || 'Erreur lors de l\'envoi'))
       .finally(() => setSubmitting(false));
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-space-950">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold-400" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-space-950">
@@ -101,11 +80,11 @@ export default function Landing() {
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Formulaires et documents
+            Faire une demande en ligne
           </h1>
           <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
-            Téléchargez les formulaires et documents nécessaires à vos démarches administratives,
-            ou soumettez une demande en ligne : elle sera transmise à votre supérieur pour validation.
+            Soumettez votre demande sans avoir de compte : elle sera transmise à votre supérieur
+            hiérarchique qui la validera ou la refusera par email.
           </p>
           <div className="flex items-center justify-center gap-4 mt-8">
             <a
@@ -114,13 +93,6 @@ export default function Landing() {
             >
               <ClipboardList className="size-4" />
               Faire une demande
-            </a>
-            <a
-              href="#documents"
-              className="btn btn-ghost text-sm"
-            >
-              <FileText className="size-4" />
-              Voir les documents
             </a>
           </div>
         </div>
@@ -221,50 +193,6 @@ export default function Landing() {
               <p className="text-xs text-zinc-600 text-center mt-3">
                 Une seule demande par envoi. Votre supérieur recevra un lien de validation à usage unique.
               </p>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Document list */}
-      <section id="documents" className="pb-20 px-4">
-        <div className="max-w-4xl mx-auto">
-          {documents.length === 0 ? (
-            <div className="text-center py-20">
-              <FileText className="size-16 text-zinc-700 mx-auto mb-4" />
-              <p className="text-zinc-500">Aucun document disponible pour le moment.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {documents.map((doc) => (
-                <a
-                  key={doc.id}
-                  href={doc.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex items-center gap-4 p-5 rounded-xl bg-space-900/50 border border-space-800/50 hover:border-gold-400/30 hover:bg-space-900/80 transition-all duration-200"
-                >
-                  <div className="size-12 rounded-lg bg-gold-400/10 flex items-center justify-center flex-shrink-0 group-hover:bg-gold-400/20 transition-colors">
-                    <FileText className="size-6 text-gold-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-white truncate group-hover:text-gold-400 transition-colors">
-                      {doc.title}
-                    </h3>
-                    {doc.description && (
-                      <p className="text-sm text-zinc-500 mt-1 line-clamp-2">
-                        {doc.description}
-                      </p>
-                    )}
-                    <p className="text-xs text-zinc-600 mt-1">
-                      {doc.fileName} &middot; {formatSize(doc.fileSize)}
-                    </p>
-                  </div>
-                  <div className="size-10 rounded-lg bg-gold-400/10 flex items-center justify-center flex-shrink-0 group-hover:bg-gold-400/20 group-hover:scale-110 transition-all">
-                    <Download className="size-5 text-gold-400" />
-                  </div>
-                </a>
-              ))}
             </div>
           )}
         </div>
