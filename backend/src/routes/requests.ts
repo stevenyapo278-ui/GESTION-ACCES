@@ -4,6 +4,7 @@ import { RequestStatus, Role } from '@prisma/client';
 import rateLimit from 'express-rate-limit';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { sendRequestToSuperior, sendRequestDecisionToAdmin } from '../services/emailSender';
+import { getNotificationEmail } from '../services/systemSettings';
 
 const router = Router();
 
@@ -120,6 +121,17 @@ router.get('/types/public', async (_req: Request, res: Response) => {
     res.json(types);
   } catch (error) {
     console.error('List public request types error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/requests/public/contact — Email de contact pour les formulaires à transmettre (public)
+router.get('/public/contact', async (_req: Request, res: Response) => {
+  try {
+    const notificationEmail = await getNotificationEmail();
+    res.json({ notificationEmail: notificationEmail || '' });
+  } catch (error) {
+    console.error('Get public contact email error:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

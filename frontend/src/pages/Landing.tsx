@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Database, ArrowRight, LogIn, ClipboardList, Send, Loader2, CheckCircle2 } from 'lucide-react';
-import { publicRequestsAPI } from '../services/api';
+import { Database, ArrowRight, LogIn, ClipboardList, Send, Loader2, CheckCircle2, FileText, Download, Mail } from 'lucide-react';
+import { publicRequestsAPI, documentsAPI } from '../services/api';
+import type { Document } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -13,8 +14,16 @@ interface RequestType {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' o';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' Ko';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' Mo';
+}
+
 export default function Landing() {
   const [types, setTypes] = useState<RequestType[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [contactEmail, setContactEmail] = useState('');
   const [requestForm, setRequestForm] = useState({ typeId: '', requesterName: '', requesterEmail: '', superiorEmail: '', details: '' });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -24,6 +33,12 @@ export default function Landing() {
   useEffect(() => {
     publicRequestsAPI.types()
       .then((res) => setTypes(res.data))
+      .catch(() => {});
+    documentsAPI.list()
+      .then((res) => setDocuments(res.data))
+      .catch(() => {});
+    publicRequestsAPI.contact()
+      .then((res) => setContactEmail(res.data.notificationEmail || ''))
       .catch(() => {});
   }, []);
 
@@ -83,16 +98,24 @@ export default function Landing() {
             Faire une demande en ligne
           </h1>
           <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
-            Soumettez votre demande sans avoir de compte : elle sera transmise à votre supérieur
-            hiérarchique qui la validera ou la refusera par email.
+            Deux façons de faire votre demande : remplissez le formulaire en ligne — elle sera
+            transmise à votre supérieur hiérarchique qui la validera par email — ou téléchargez
+            le formulaire, remplissez-le et transmettez-le nous par email.
           </p>
-          <div className="flex items-center justify-center gap-4 mt-8">
+          <div className="flex flex-wrap items-center justify-center gap-4 mt-8">
             <a
               href="#demande"
               className="btn btn-primary text-sm"
             >
               <ClipboardList className="size-4" />
-              Faire une demande
+              Faire une demande en ligne
+            </a>
+            <a
+              href="#formulaires"
+              className="btn btn-ghost text-sm"
+            >
+              <FileText className="size-4" />
+              Télécharger un formulaire
             </a>
           </div>
         </div>
@@ -105,7 +128,7 @@ export default function Landing() {
             <div className="size-14 rounded-2xl bg-gold-400/10 flex items-center justify-center mx-auto mb-4">
               <ClipboardList className="size-7 text-gold-400" />
             </div>
-            <h2 className="text-3xl font-bold text-white">Faire une demande</h2>
+            <h2 className="text-3xl font-bold text-white">1. Demande en ligne</h2>
             <p className="text-zinc-400 mt-2 max-w-xl mx-auto">
               Remplissez ce formulaire sans avoir de compte. Votre supérieur hiérarchique recevra un
               email avec les boutons Valider / Refuser, et l'équipe sera notifiée de la décision.
@@ -194,6 +217,80 @@ export default function Landing() {
                 Une seule demande par envoi. Votre supérieur recevra un lien de validation à usage unique.
               </p>
             </div>
+          )}
+        </div>
+      </section>
+
+      {/* Downloadable form documents */}
+      <section id="formulaires" className="py-16 px-4">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="size-14 rounded-2xl bg-gold-400/10 flex items-center justify-center mx-auto mb-4">
+              <FileText className="size-7 text-gold-400" />
+            </div>
+            <h2 className="text-3xl font-bold text-white">2. Demande par formulaire à télécharger</h2>
+            <p className="text-zinc-400 mt-2 max-w-xl mx-auto">
+              Téléchargez le formulaire correspondant à votre demande, imprimez-le ou remplissez-le,
+              puis transmettez-le nous par email.
+            </p>
+          </div>
+
+          {documents.length === 0 ? (
+            <div className="text-center text-zinc-500 py-8">
+              Aucun formulaire disponible pour le moment.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="rounded-2xl border border-space-800/60 bg-space-900/60 p-5 md:p-6 flex flex-col md:flex-row md:items-center gap-4"
+                >
+                  <div className="size-12 shrink-0 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                    <FileText className="size-6 text-blue-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-white">{doc.title}</h3>
+                    {doc.description && (
+                      <p className="text-sm text-zinc-400 mt-0.5 line-clamp-2">{doc.description}</p>
+                    )}
+                    <p className="text-xs text-zinc-600 mt-1">
+                      {doc.fileName} · {formatSize(doc.fileSize)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <a
+                      href={doc.fileUrl}
+                      download={doc.fileName}
+                      className="btn btn-ghost text-sm"
+                    >
+                      <Download className="size-4" />
+                      Télécharger
+                    </a>
+                    {contactEmail ? (
+                      <a
+                        href={`mailto:${contactEmail}?subject=${encodeURIComponent('Formulaire rempli - ' + doc.title)}`}
+                        className="btn btn-primary text-sm"
+                      >
+                        <Mail className="size-4" />
+                        Envoyer par email
+                      </a>
+                    ) : (
+                      <span className="text-xs text-zinc-600">Email de contact non configuré</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {contactEmail && (
+            <p className="text-sm text-zinc-500 text-center mt-6">
+              Pour transmettre un formulaire rempli, envoyez-le à{' '}
+              <a href={`mailto:${contactEmail}`} className="text-gold-400 hover:underline">
+                {contactEmail}
+              </a>
+            </p>
           )}
         </div>
       </section>
