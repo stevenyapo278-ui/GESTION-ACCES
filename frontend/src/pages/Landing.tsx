@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { FileText, Download, Database, ArrowRight, LogIn } from 'lucide-react';
-import { documentsAPI } from '../services/api';
+import { FileText, Download, Database, ArrowRight, LogIn, ClipboardList, Send, Loader2, CheckCircle2 } from 'lucide-react';
+import { documentsAPI, publicRequestsAPI } from '../services/api';
 import type { Document } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' o';
@@ -11,9 +12,21 @@ function formatSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + ' Mo';
 }
 
+interface RequestType {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function Landing() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [types, setTypes] = useState<RequestType[]>([]);
+  const [requestForm, setRequestForm] = useState({ typeId: '', requesterName: '', requesterEmail: '', superiorEmail: '', details: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -22,7 +35,26 @@ export default function Landing() {
       .then((res) => setDocuments(res.data))
       .catch(() => {})
       .finally(() => setLoading(false));
+    publicRequestsAPI.types()
+      .then((res) => setTypes(res.data))
+      .catch(() => {});
   }, []);
+
+  const submitRequest = () => {
+    if (!requestForm.typeId) return toast.error('Veuillez choisir un type de demande');
+    if (!requestForm.requesterName.trim()) return toast.error('Veuillez saisir votre nom');
+    if (!EMAIL_REGEX.test(requestForm.requesterEmail)) return toast.error('Votre adresse email est invalide');
+    if (!EMAIL_REGEX.test(requestForm.superiorEmail)) return toast.error('Adresse email du supérieur invalide');
+
+    setSubmitting(true);
+    publicRequestsAPI.create(requestForm)
+      .then(() => {
+        setSubmitted(true);
+        toast.success('Demande envoyée. Votre supérieur va recevoir un email de validation.');
+      })
+      .catch((err) => toast.error(err.response?.data?.error || 'Erreur lors de l\'envoi'))
+      .finally(() => setSubmitting(false));
+  };
 
   if (loading) {
     return (
@@ -72,13 +104,130 @@ export default function Landing() {
             Formulaires et documents
           </h1>
           <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
-            Téléchargez les formulaires et documents nécessaires à vos démarches administratives.
+            Téléchargez les formulaires et documents nécessaires à vos démarches administratives,
+            ou soumettez une demande en ligne : elle sera transmise à votre supérieur pour validation.
           </p>
+          <div className="flex items-center justify-center gap-4 mt-8">
+            <a
+              href="#demande"
+              className="btn btn-primary text-sm"
+            >
+              <ClipboardList className="size-4" />
+              Faire une demande
+            </a>
+            <a
+              href="#documents"
+              className="btn btn-ghost text-sm"
+            >
+              <FileText className="size-4" />
+              Voir les documents
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Request form (no login required) */}
+      <section id="demande" className="py-16 px-4 bg-space-900/30 border-y border-space-800/50">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="size-14 rounded-2xl bg-gold-400/10 flex items-center justify-center mx-auto mb-4">
+              <ClipboardList className="size-7 text-gold-400" />
+            </div>
+            <h2 className="text-3xl font-bold text-white">Faire une demande</h2>
+            <p className="text-zinc-400 mt-2 max-w-xl mx-auto">
+              Remplissez ce formulaire sans avoir de compte. Votre supérieur hiérarchique recevra un
+              email avec les boutons Valider / Refuser, et l'équipe sera notifiée de la décision.
+            </p>
+          </div>
+
+          {submitted ? (
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-8 text-center">
+              <CheckCircle2 className="size-12 text-emerald-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-white mb-2">Demande envoyée !</h3>
+              <p className="text-zinc-300">
+                Votre demande a bien été transmise à <strong>{requestForm.superiorEmail}</strong>.
+                Vous serez informé de la décision par votre supérieur.
+              </p>
+              <button
+                onClick={() => { setSubmitted(false); setRequestForm({ typeId: '', requesterName: '', requesterEmail: '', superiorEmail: '', details: '' }); }}
+                className="btn btn-primary text-sm mt-6"
+              >
+                Faire une autre demande
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-space-800/60 bg-space-900/60 p-6 md:p-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1.5">Votre nom complet *</label>
+                  <input
+                    className="w-full rounded-lg bg-space-950/80 border border-space-700/60 px-4 py-2.5 text-white placeholder-zinc-600 focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30"
+                    placeholder="Jean Dupont"
+                    value={requestForm.requesterName}
+                    onChange={(e) => setRequestForm({ ...requestForm, requesterName: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1.5">Votre adresse email *</label>
+                  <input
+                    type="email"
+                    className="w-full rounded-lg bg-space-950/80 border border-space-700/60 px-4 py-2.5 text-white placeholder-zinc-600 focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30"
+                    placeholder="jean.dupont@entreprise.com"
+                    value={requestForm.requesterEmail}
+                    onChange={(e) => setRequestForm({ ...requestForm, requesterEmail: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1.5">Type de demande *</label>
+                  <select
+                    className="w-full rounded-lg bg-space-950/80 border border-space-700/60 px-4 py-2.5 text-white focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30"
+                    value={requestForm.typeId}
+                    onChange={(e) => setRequestForm({ ...requestForm, typeId: e.target.value })}
+                  >
+                    <option value="">— Choisir —</option>
+                    {types.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1.5">Email du supérieur hiérarchique *</label>
+                  <input
+                    type="email"
+                    className="w-full rounded-lg bg-space-950/80 border border-space-700/60 px-4 py-2.5 text-white placeholder-zinc-600 focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30"
+                    placeholder="chef@entreprise.com"
+                    value={requestForm.superiorEmail}
+                    onChange={(e) => setRequestForm({ ...requestForm, superiorEmail: e.target.value })}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm text-zinc-400 mb-1.5">Détails (optionnel)</label>
+                  <textarea
+                    className="w-full rounded-lg bg-space-950/80 border border-space-700/60 px-4 py-2.5 text-white placeholder-zinc-600 focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30 resize-y min-h-20"
+                    placeholder="Précisez le contexte de votre demande..."
+                    value={requestForm.details}
+                    onChange={(e) => setRequestForm({ ...requestForm, details: e.target.value })}
+                  />
+                </div>
+              </div>
+              <button
+                onClick={submitRequest}
+                disabled={submitting}
+                className="btn btn-primary w-full mt-6"
+              >
+                {submitting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                Envoyer la demande
+              </button>
+              <p className="text-xs text-zinc-600 text-center mt-3">
+                Une seule demande par envoi. Votre supérieur recevra un lien de validation à usage unique.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Document list */}
-      <section className="pb-20 px-4">
+      <section id="documents" className="pb-20 px-4">
         <div className="max-w-4xl mx-auto">
           {documents.length === 0 ? (
             <div className="text-center py-20">

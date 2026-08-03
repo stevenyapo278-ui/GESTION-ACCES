@@ -1,12 +1,21 @@
 import prisma from '../lib/prisma';
 import { Router, Request, Response } from 'express';
 import { RequestStatus, Role } from '@prisma/client';
+import rateLimit from 'express-rate-limit';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { sendRequestToSuperior, sendRequestDecisionToAdmin } from '../services/emailSender';
 
 const router = Router();
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const publicRequestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,
+  message: { error: 'Trop de requêtes, veuillez réessayer dans quelques minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC ROUTES (no auth required — lien de décision envoyé par email)
@@ -32,8 +41,8 @@ router.get('/review/:token', async (req: Request, res: Response) => {
       id: request.id,
       typeName: request.type.name,
       typeDescription: request.type.description,
-      requesterName: `${request.requester.firstName} ${request.requester.lastName}`,
-      requesterEmail: request.requester.email,
+      requesterName: request.requesterName || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'Utilisateur'),
+      requesterEmail: request.requesterEmail || request.requester?.email || '',
       details: request.details,
       createdAt: request.createdAt,
       status: request.status,
@@ -96,6 +105,77 @@ router.post('/review/:token', async (req: Request, res: Response) => {
     res.json({ message: action === 'APPROVE' ? 'Demande validée' : 'Demande refusée', status: updated.status });
   } catch (error) {
     console.error('Decide request error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/requests/types/public — List active request types (public)
+router.get('/types/public', async (_req: Request, res: Response) => {
+  try {
+    const types = await prisma.requestType.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, description: true },
+      orderBy: { name: 'asc' },
+    });
+    res.json(types);
+  } catch (error) {
+    console.error('List public request types error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /api/requests/public — Create a request without authentication (from landing page)
+router.post('/public', publicRequestLimiter, async (req: Request, res: Response) => {
+  try {
+    const { typeId, superiorEmail, requesterName, requesterEmail, details } = req.body;
+
+    if (!typeId) {
+      res.status(400).json({ error: 'Le type de demande est requis' });
+      return;
+    }
+    if (!requesterName || !requesterName.trim()) {
+      res.status(400).json({ error: 'Votre nom est requis' });
+      return;
+    }
+    if (!requesterEmail || !EMAIL_REGEX.test(requesterEmail)) {
+      res.status(400).json({ error: 'Votre adresse email est invalide' });
+      return;
+    }
+    if (!superiorEmail || !EMAIL_REGEX.test(superiorEmail)) {
+      res.status(400).json({ error: 'Adresse email du supérieur invalide' });
+      return;
+    }
+
+    const type = await prisma.requestType.findUnique({ where: { id: typeId } });
+    if (!type || !type.isActive) {
+      res.status(400).json({ error: 'Type de demande introuvable ou inactif' });
+      return;
+    }
+
+    const request = await prisma.request.create({
+      data: {
+        typeId,
+        requesterName: requesterName.trim(),
+        requesterEmail: requesterEmail.trim().toLowerCase(),
+        superiorEmail,
+        details: details || null,
+      },
+    });
+
+    try {
+      await sendRequestToSuperior({ ...request, type: { name: type.name } });
+    } catch (err) {
+      console.error('Superior email error (public):', (err as Error).message);
+      res.status(201).json({
+        ...request,
+        emailError: "La demande a été créée mais l'email au supérieur n'a pas pu être envoyé. Vérifiez la configuration du compte email.",
+      });
+      return;
+    }
+
+    res.status(201).json(request);
+  } catch (error) {
+    console.error('Create public request error:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -240,6 +320,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       data: {
         typeId,
         requesterId: req.user!.id,
+        requesterName: `${req.user!.firstName} ${req.user!.lastName}`,
+        requesterEmail: req.user!.email,
         superiorEmail,
         details: details || null,
       },

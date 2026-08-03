@@ -91,10 +91,12 @@ const EMAIL_STYLE = `
   </style>`;
 
 function detailTable(request: any): string {
-  const requesterName = request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'Utilisateur';
+  const requesterName = request.requesterName
+    || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'Utilisateur');
+  const requesterEmail = request.requesterEmail || request.requester?.email || '';
   return `
   <table>
-    <tr><td>Demandeur</td><td>${requesterName} (${request.requester?.email || ''})</td></tr>
+    <tr><td>Demandeur</td><td>${requesterName} ${requesterEmail ? `(${requesterEmail})` : ''}</td></tr>
     <tr><td>Type de demande</td><td>${request.type?.name || 'Demande'}</td></tr>
     ${request.details ? `<tr><td>Détails</td><td>${request.details}</td></tr>` : ''}
     <tr><td>Date</td><td>${new Date(request.createdAt).toLocaleString('fr-FR')}</td></tr>
@@ -105,7 +107,9 @@ function detailTable(request: any): string {
 export async function sendRequestToSuperior(request: any): Promise<void> {
   const frontendUrl = await resolveFrontendUrl();
   const reviewUrl = `${frontendUrl}/requests/review/${request.decisionToken}`;
-  const subject = `[Validation] Demande de ${request.requester?.firstName || 'l\'utilisateur'} — ${request.type?.name || 'Demande'}`;
+  const requesterName = request.requesterName
+    || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'l\'utilisateur');
+  const subject = `[Validation] Demande de ${requesterName} — ${request.type?.name || 'Demande'}`;
   const bodyHtml = `
   ${EMAIL_STYLE}
   <div class="card">
@@ -129,7 +133,9 @@ export async function sendRequestDecisionToAdmin(request: any): Promise<void> {
   if (!notificationEmail) return;
 
   const approved = request.status === 'APPROVED';
-  const subject = `${approved ? '✅ Validée' : '❌ Refusée'} — Demande de ${request.requester?.firstName || 'l\'utilisateur'} (${request.type?.name || 'Demande'})`;
+  const requesterName = request.requesterName
+    || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'l\'utilisateur');
+  const subject = `${approved ? '✅ Validée' : '❌ Refusée'} — Demande de ${requesterName} (${request.type?.name || 'Demande'})`;
   const decisionBadge = approved
     ? '<span style="background:#dcfce7;color:#166534;padding:4px 12px;border-radius:999px;font-weight:600">Validée</span>'
     : '<span style="background:#fee2e2;color:#991b1b;padding:4px 12px;border-radius:999px;font-weight:600">Refusée</span>';

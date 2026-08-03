@@ -410,7 +410,9 @@ model RequestType {
 model Request {
   id             String        @id @default(uuid())
   typeId         String
-  requesterId    String
+  requesterId    String?
+  requesterName  String?
+  requesterEmail String?
   superiorEmail  String
   details        String?
   status         RequestStatus @default(PENDING)
@@ -422,7 +424,7 @@ model Request {
   updatedAt      DateTime      @updatedAt
 
   type      RequestType @relation(fields: [typeId], references: [id])
-  requester User        @relation("RequestRequester", fields: [requesterId], references: [id])
+  requester User?       @relation("RequestRequester", fields: [requesterId], references: [id])
   approver  User?       @relation("RequestApprover", fields: [decidedBy], references: [id])
 
   @@map("requests")

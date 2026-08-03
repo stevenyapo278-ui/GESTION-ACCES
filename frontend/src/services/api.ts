@@ -258,6 +258,13 @@ export const requestsAPI = {
   },
 };
 
+// === Public Requests API (no auth — from landing page) ===
+export const publicRequestsAPI = {
+  types: () => axios.get('/api/requests/types/public'),
+  create: (data: { typeId: string; superiorEmail: string; requesterName: string; requesterEmail: string; details?: string }) =>
+    axios.post('/api/requests/public', data),
+};
+
 // === Email Accounts API ===
 export const emailAccountsAPI = {
   list: () => api.get('/email-accounts'),
