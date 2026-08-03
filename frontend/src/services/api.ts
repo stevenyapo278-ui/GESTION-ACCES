@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { RequestField } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -242,7 +243,7 @@ export const documentsAPI = {
 
 // === Requests API (demandes de validation) ===
 export const requestsAPI = {
-  create: (data: { typeId: string; superiorEmail: string; details?: string }) =>
+  create: (data: { typeId: string; superiorEmail: string; details?: string; data?: Record<string, string> }) =>
     api.post('/requests', data),
   mine: () => api.get('/requests/mine'),
   list: (params?: { status?: string }) => api.get('/requests', { params }),
@@ -252,7 +253,7 @@ export const requestsAPI = {
   types: {
     list: () => api.get('/requests/types'),
     listAll: () => api.get('/requests/types/all'),
-    create: (data: { name: string; description?: string }) => api.post('/requests/types', data),
+    create: (data: { name: string; description?: string; fields?: RequestField[] }) => api.post('/requests/types', data),
     update: (id: string, data: any) => api.put(`/requests/types/${id}`, data),
     delete: (id: string) => api.delete(`/requests/types/${id}`),
   },
@@ -262,7 +263,7 @@ export const requestsAPI = {
 export const publicRequestsAPI = {
   types: () => axios.get('/api/requests/types/public'),
   contact: () => axios.get('/api/requests/public/contact'),
-  create: (data: { typeId: string; superiorEmail: string; requesterName: string; requesterEmail: string; details?: string }) =>
+  create: (data: { typeId: string; superiorEmail: string; requesterName: string; requesterEmail: string; details?: string; data?: Record<string, string> }) =>
     axios.post('/api/requests/public', data),
 };
 

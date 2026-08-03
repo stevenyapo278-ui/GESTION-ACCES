@@ -2,12 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Send, Loader2, Clock, CheckCircle2, XCircle, Inbox, ClipboardList } from 'lucide-react';
 import { requestsAPI } from '../services/api';
+import type { RequestField } from '../types';
 import toast from 'react-hot-toast';
 
 interface RequestType {
   id: string;
   name: string;
   description?: string;
+  fields?: RequestField[];
 }
 
 interface RequestItem {
@@ -15,11 +17,12 @@ interface RequestItem {
   typeId: string;
   superiorEmail: string;
   details?: string;
+  data?: Record<string, string>;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   decisionComment?: string;
   decidedAt?: string;
   createdAt: string;
-  type: { name: string };
+  type: { name: string; fields?: RequestField[] };
 }
 
 const statusConfig: Record<RequestItem['status'], { label: string; icon: React.ElementType; color: string }> = {
@@ -28,15 +31,26 @@ const statusConfig: Record<RequestItem['status'], { label: string; icon: React.E
   REJECTED: { label: 'Refusée', icon: XCircle, color: 'text-red-500 bg-red-500/10' },
 };
 
+function answerSummary(r: RequestItem): string {
+  const answers = (r.type.fields || [])
+    .map((f) => r.data?.[f.key])
+    .filter((v) => v && v.trim() !== '')
+    .join(' · ');
+  return [answers, r.details].filter(Boolean).join(' · ') || '—';
+}
+
 export default function Requests() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<'new' | 'mine'>('new');
   const [form, setForm] = useState({ typeId: '', superiorEmail: '', details: '' });
+  const [answers, setAnswers] = useState<Record<string, string>>({});
 
   const { data: types, isLoading: typesLoading } = useQuery<RequestType[]>({
     queryKey: ['request-types'],
     queryFn: async () => (await requestsAPI.types.list()).data,
   });
+
+  const selectedType = types?.find((t) => t.id === form.typeId);
 
   const { data: myRequests, isLoading: requestsLoading } = useQuery<RequestItem[]>({
     queryKey: ['my-requests'],
@@ -45,10 +59,11 @@ export default function Requests() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () => requestsAPI.create(form),
+    mutationFn: () => requestsAPI.create({ ...form, data: answers }),
     onSuccess: () => {
       toast.success('Demande envoyée. Un email de validation a été adressé à votre supérieur.');
       setForm({ typeId: '', superiorEmail: '', details: '' });
+      setAnswers({});
       queryClient.invalidateQueries({ queryKey: ['my-requests'] });
       setTab('mine');
     },
@@ -59,6 +74,12 @@ export default function Requests() {
     if (!form.typeId) return toast.error('Veuillez choisir un type de demande');
     if (!form.superiorEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.superiorEmail)) {
       return toast.error('Adresse email du supérieur invalide');
+    }
+    for (const field of selectedType?.fields || []) {
+      const value = (answers[field.key] || '').trim();
+      if (field.required && value === '') {
+        return toast.error(`Le champ « ${field.label} » est requis`);
+      }
     }
     createMutation.mutate();
   };
@@ -98,7 +119,7 @@ export default function Requests() {
               {typesLoading ? (
                 <div className="flex items-center gap-2 text-sm text-zinc-500"><Loader2 className="size-4 animate-spin" /> Chargement...</div>
               ) : (
-                <select className="input" value={form.typeId} onChange={(e) => setForm({ ...form, typeId: e.target.value })}>
+                <select className="input" value={form.typeId} onChange={(e) => { setForm({ ...form, typeId: e.target.value }); setAnswers({}); }}>
                   <option value="">— Choisir —</option>
                   {types?.map((t) => (
                     <option key={t.id} value={t.id}>{t.name}</option>
@@ -129,6 +150,40 @@ export default function Requests() {
                 onChange={(e) => setForm({ ...form, details: e.target.value })}
               />
             </div>
+            {selectedType?.fields?.map((field) => (
+              <div key={field.key}>
+                <label className="label">
+                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                </label>
+                {field.type === 'textarea' ? (
+                  <textarea
+                    className="input min-h-20 resize-y"
+                    placeholder={field.label}
+                    value={answers[field.key] || ''}
+                    onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                  />
+                ) : field.type === 'select' ? (
+                  <select
+                    className="input"
+                    value={answers[field.key] || ''}
+                    onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                  >
+                    <option value="">— Choisir —</option>
+                    {(field.options || []).map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+                    className="input"
+                    placeholder={field.label}
+                    value={answers[field.key] || ''}
+                    onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                  />
+                )}
+              </div>
+            ))}
             <button onClick={submit} disabled={createMutation.isPending} className="btn-primary">
               {createMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               Envoyer la demande
@@ -163,7 +218,7 @@ export default function Requests() {
                       <tr key={r.id} className="hover:bg-white/[0.02] transition-colors">
                         <td className="px-5 py-4 font-medium" style={{ color: 'var(--text-primary)' }}>{r.type.name}</td>
                         <td className="px-5 py-4 text-sm text-zinc-500">{r.superiorEmail}</td>
-                        <td className="px-5 py-4 text-sm text-zinc-400 max-w-xs truncate">{r.details || '—'}</td>
+                        <td className="px-5 py-4 text-sm text-zinc-400 max-w-xs truncate">{answerSummary(r)}</td>
                         <td className="px-5 py-4 text-sm text-zinc-500">{new Date(r.createdAt).toLocaleDateString('fr-FR')}</td>
                         <td className="px-5 py-4">
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${s.color}`}>

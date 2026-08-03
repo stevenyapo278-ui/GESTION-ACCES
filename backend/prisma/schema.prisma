@@ -398,6 +398,7 @@ model RequestType {
   id          String   @id @default(uuid())
   name        String   @unique
   description String?
+  fields      Json?    @default("[]")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -408,20 +409,21 @@ model RequestType {
 }
 
 model Request {
-  id             String        @id @default(uuid())
-  typeId         String
-  requesterId    String?
-  requesterName  String?
-  requesterEmail String?
-  superiorEmail  String
-  details        String?
-  status         RequestStatus @default(PENDING)
-  decisionToken  String        @unique @default(uuid())
-  decidedBy      String?
-  decidedAt      DateTime?
+  id              String        @id @default(uuid())
+  typeId          String
+  requesterId     String?
+  requesterName   String?
+  requesterEmail  String?
+  superiorEmail   String
+  details         String?
+  data            Json?         @default("{}")
+  status          RequestStatus @default(PENDING)
+  decisionToken   String        @unique @default(uuid())
+  decidedBy       String?
+  decidedAt       DateTime?
   decisionComment String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   type      RequestType @relation(fields: [typeId], references: [id])
   requester User?       @relation("RequestRequester", fields: [requesterId], references: [id])

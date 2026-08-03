@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Database, ArrowRight, LogIn, ClipboardList, Send, Loader2, CheckCircle2, FileText, Download, Mail } from 'lucide-react';
 import { publicRequestsAPI, documentsAPI } from '../services/api';
-import type { Document } from '../types';
+import type { Document, RequestField } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -10,6 +10,7 @@ interface RequestType {
   id: string;
   name: string;
   description?: string;
+  fields?: RequestField[];
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -25,10 +26,12 @@ export default function Landing() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [contactEmail, setContactEmail] = useState('');
   const [requestForm, setRequestForm] = useState({ typeId: '', requesterName: '', requesterEmail: '', superiorEmail: '', details: '' });
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const selectedType = types.find((t) => t.id === requestForm.typeId);
 
   useEffect(() => {
     publicRequestsAPI.types()
@@ -48,8 +51,15 @@ export default function Landing() {
     if (!EMAIL_REGEX.test(requestForm.requesterEmail)) return toast.error('Votre adresse email est invalide');
     if (!EMAIL_REGEX.test(requestForm.superiorEmail)) return toast.error('Adresse email du supérieur invalide');
 
+    for (const field of selectedType?.fields || []) {
+      const value = (answers[field.key] || '').trim();
+      if (field.required && value === '') {
+        return toast.error(`Le champ « ${field.label} » est requis`);
+      }
+    }
+
     setSubmitting(true);
-    publicRequestsAPI.create(requestForm)
+    publicRequestsAPI.create({ ...requestForm, data: answers })
       .then(() => {
         setSubmitted(true);
         toast.success('Demande envoyée. Votre supérieur va recevoir un email de validation.');
@@ -144,7 +154,7 @@ export default function Landing() {
                 Vous serez informé de la décision par votre supérieur.
               </p>
               <button
-                onClick={() => { setSubmitted(false); setRequestForm({ typeId: '', requesterName: '', requesterEmail: '', superiorEmail: '', details: '' }); }}
+                onClick={() => { setSubmitted(false); setRequestForm({ typeId: '', requesterName: '', requesterEmail: '', superiorEmail: '', details: '' }); setAnswers({}); }}
                 className="btn btn-primary text-sm mt-6"
               >
                 Faire une autre demande
@@ -177,7 +187,7 @@ export default function Landing() {
                   <select
                     className="w-full rounded-lg bg-space-950/80 border border-space-700/60 px-4 py-2.5 text-white focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30"
                     value={requestForm.typeId}
-                    onChange={(e) => setRequestForm({ ...requestForm, typeId: e.target.value })}
+                    onChange={(e) => { setRequestForm({ ...requestForm, typeId: e.target.value }); setAnswers({}); }}
                   >
                     <option value="">— Choisir —</option>
                     {types.map((t) => (
@@ -204,6 +214,40 @@ export default function Landing() {
                     onChange={(e) => setRequestForm({ ...requestForm, details: e.target.value })}
                   />
                 </div>
+                {selectedType?.fields?.map((field) => (
+                  <div key={field.key} className="md:col-span-2">
+                    <label className="block text-sm text-zinc-400 mb-1.5">
+                      {field.label} {field.required && <span className="text-gold-400">*</span>}
+                    </label>
+                    {field.type === 'textarea' ? (
+                      <textarea
+                        className="w-full rounded-lg bg-space-950/80 border border-space-700/60 px-4 py-2.5 text-white placeholder-zinc-600 focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30 resize-y min-h-20"
+                        placeholder={field.label}
+                        value={answers[field.key] || ''}
+                        onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                      />
+                    ) : field.type === 'select' ? (
+                      <select
+                        className="w-full rounded-lg bg-space-950/80 border border-space-700/60 px-4 py-2.5 text-white focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30"
+                        value={answers[field.key] || ''}
+                        onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                      >
+                        <option value="">— Choisir —</option>
+                        {(field.options || []).map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+                        className="w-full rounded-lg bg-space-950/80 border border-space-700/60 px-4 py-2.5 text-white placeholder-zinc-600 focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30"
+                        placeholder={field.label}
+                        value={answers[field.key] || ''}
+                        onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                      />
+                    )}
+                  </div>
+                ))}
               </div>
               <button
                 onClick={submitRequest}

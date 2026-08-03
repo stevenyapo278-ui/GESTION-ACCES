@@ -90,6 +90,20 @@ const EMAIL_STYLE = `
     .footer { color: #94a3b8; font-size: 12px; margin-top: 24px; }
   </style>`;
 
+function answersRows(request: any): string {
+  const data = request.data && typeof request.data === 'object' ? request.data : {};
+  const fields = Array.isArray(request.type?.fields) ? request.type.fields : [];
+  const rows = fields
+    .filter((f: any) => f?.key && data[f.key] !== undefined && data[f.key] !== '')
+    .map((f: any) => `<tr><td>${f.label || f.key}</td><td>${data[f.key]}</td></tr>`)
+    .join('');
+  const extra = Object.entries(data)
+    .filter(([k]) => !fields.some((f: any) => f.key === k))
+    .map(([k, v]) => `<tr><td>${k}</td><td>${String(v)}</td></tr>`)
+    .join('');
+  return rows + extra;
+}
+
 function detailTable(request: any): string {
   const requesterName = request.requesterName
     || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'Utilisateur');
@@ -98,6 +112,7 @@ function detailTable(request: any): string {
   <table>
     <tr><td>Demandeur</td><td>${requesterName} ${requesterEmail ? `(${requesterEmail})` : ''}</td></tr>
     <tr><td>Type de demande</td><td>${request.type?.name || 'Demande'}</td></tr>
+    ${answersRows(request)}
     ${request.details ? `<tr><td>Détails</td><td>${request.details}</td></tr>` : ''}
     <tr><td>Date</td><td>${new Date(request.createdAt).toLocaleString('fr-FR')}</td></tr>
   </table>`;

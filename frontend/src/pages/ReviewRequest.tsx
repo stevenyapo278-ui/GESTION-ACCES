@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { requestsAPI } from '../services/api';
+import type { RequestField } from '../types';
 import { Loader2, CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
 
 interface ReviewData {
@@ -10,6 +11,8 @@ interface ReviewData {
   requesterName: string;
   requesterEmail: string;
   details?: string;
+  data?: Record<string, string>;
+  typeFields?: RequestField[];
   createdAt: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   decidedAt?: string;
@@ -111,6 +114,16 @@ export default function ReviewRequest() {
                   <span className="text-zinc-500">Date</span>
                   <span className="font-medium text-zinc-700">{new Date(data.createdAt).toLocaleString('fr-FR')}</span>
                 </div>
+                {data.typeFields?.map((field) => {
+                  const value = data.data?.[field.key];
+                  if (!value || value.trim() === '') return null;
+                  return (
+                    <div key={field.key} className="py-2 border-b border-zinc-100">
+                      <span className="text-zinc-500 block mb-1">{field.label}</span>
+                      <span className="text-zinc-700 whitespace-pre-wrap">{value}</span>
+                    </div>
+                  );
+                })}
                 {data.details && (
                   <div className="py-2 border-b border-zinc-100">
                     <span className="text-zinc-500 block mb-1">Détails</span>

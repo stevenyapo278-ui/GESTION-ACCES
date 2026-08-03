@@ -10,6 +10,20 @@ const router = Router();
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Valide les réponses aux champs personnalisés du type de demande et retourne l'objet data
+function validateAnswers(type: { fields?: unknown }, data: unknown): Record<string, string> {
+  const answers: Record<string, string> = {};
+  const fields = Array.isArray(type.fields) ? type.fields : [];
+  for (const field of fields as Array<{ key?: string; label?: string; required?: boolean }>) {
+    const value = (data && typeof data === 'object' ? (data as Record<string, unknown>)[field.key || ''] : undefined);
+    if (field.required && (value === undefined || value === null || String(value).trim() === '')) {
+      throw new Error(`Le champ « ${field.label || field.key} » est requis`);
+    }
+    if (value !== undefined && value !== null) answers[field.key || ''] = String(value);
+  }
+  return answers;
+}
+
 const publicRequestLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 30,
@@ -28,7 +42,7 @@ router.get('/review/:token', async (req: Request, res: Response) => {
     const request = await prisma.request.findUnique({
       where: { decisionToken: req.params.token },
       include: {
-        type: { select: { name: true, description: true } },
+        type: { select: { name: true, description: true, fields: true } },
         requester: { select: { firstName: true, lastName: true, email: true } },
       },
     });
@@ -45,6 +59,8 @@ router.get('/review/:token', async (req: Request, res: Response) => {
       requesterName: request.requesterName || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'Utilisateur'),
       requesterEmail: request.requesterEmail || request.requester?.email || '',
       details: request.details,
+      data: request.data,
+      typeFields: request.type.fields,
       createdAt: request.createdAt,
       status: request.status,
       decidedAt: request.decidedAt,
@@ -68,7 +84,7 @@ router.post('/review/:token', async (req: Request, res: Response) => {
     const request = await prisma.request.findUnique({
       where: { decisionToken: req.params.token },
       include: {
-        type: { select: { name: true } },
+        type: { select: { name: true, fields: true } },
         requester: { select: { firstName: true, lastName: true, email: true } },
       },
     });
@@ -115,7 +131,7 @@ router.get('/types/public', async (_req: Request, res: Response) => {
   try {
     const types = await prisma.requestType.findMany({
       where: { isActive: true },
-      select: { id: true, name: true, description: true },
+      select: { id: true, name: true, description: true, fields: true },
       orderBy: { name: 'asc' },
     });
     res.json(types);
@@ -139,7 +155,7 @@ router.get('/public/contact', async (_req: Request, res: Response) => {
 // POST /api/requests/public — Create a request without authentication (from landing page)
 router.post('/public', publicRequestLimiter, async (req: Request, res: Response) => {
   try {
-    const { typeId, superiorEmail, requesterName, requesterEmail, details } = req.body;
+    const { typeId, superiorEmail, requesterName, requesterEmail, details, data } = req.body;
 
     if (!typeId) {
       res.status(400).json({ error: 'Le type de demande est requis' });
@@ -164,6 +180,14 @@ router.post('/public', publicRequestLimiter, async (req: Request, res: Response)
       return;
     }
 
+    let answers: Record<string, string>;
+    try {
+      answers = validateAnswers(type, data);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+
     const request = await prisma.request.create({
       data: {
         typeId,
@@ -171,11 +195,12 @@ router.post('/public', publicRequestLimiter, async (req: Request, res: Response)
         requesterEmail: requesterEmail.trim().toLowerCase(),
         superiorEmail,
         details: details || null,
+        data: answers,
       },
     });
 
     try {
-      await sendRequestToSuperior({ ...request, type: { name: type.name } });
+      await sendRequestToSuperior({ ...request, type });
     } catch (err) {
       console.error('Superior email error (public):', (err as Error).message);
       res.status(201).json({
@@ -232,7 +257,14 @@ router.post('/types', authenticate, authorize(Role.ADMIN), async (req: AuthReque
       res.status(400).json({ error: 'Le nom est requis' });
       return;
     }
-    const type = await prisma.requestType.create({ data: { name, description } });
+    const fields = typeof req.body.fields === 'string' ? JSON.parse(req.body.fields) : req.body.fields;
+    const type = await prisma.requestType.create({
+      data: {
+        name,
+        description,
+        ...(Array.isArray(fields) ? { fields } : {}),
+      },
+    });
     res.status(201).json(type);
   } catch (error: any) {
     if (error?.code === 'P2002') {
@@ -248,12 +280,14 @@ router.post('/types', authenticate, authorize(Role.ADMIN), async (req: AuthReque
 router.put('/types/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, isActive } = req.body;
+    const fields = typeof req.body.fields === 'string' ? JSON.parse(req.body.fields) : req.body.fields;
     const type = await prisma.requestType.update({
       where: { id: req.params.id },
       data: {
         ...(name !== undefined ? { name } : {}),
         ...(description !== undefined ? { description } : {}),
         ...(isActive !== undefined ? { isActive } : {}),
+        ...(Array.isArray(fields) ? { fields } : {}),
       },
     });
     res.json(type);
@@ -279,7 +313,7 @@ router.get('/mine', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const requests = await prisma.request.findMany({
       where: { requesterId: req.user!.id },
-      include: { type: { select: { name: true } } },
+      include: { type: { select: { name: true, fields: true } } },
       orderBy: { createdAt: 'desc' },
     });
     res.json(requests);
@@ -311,7 +345,7 @@ router.get('/', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, re
 // POST /api/requests — Create a request
 router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { typeId, superiorEmail, details } = req.body;
+    const { typeId, superiorEmail, details, data } = req.body;
 
     if (!typeId) {
       res.status(400).json({ error: 'Le type de demande est requis' });
@@ -328,6 +362,14 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    let answers: Record<string, string>;
+    try {
+      answers = validateAnswers(type, data);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+
     const request = await prisma.request.create({
       data: {
         typeId,
@@ -336,6 +378,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
         requesterEmail: req.user!.email,
         superiorEmail,
         details: details || null,
+        data: answers,
       },
     });
 
@@ -344,7 +387,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       await sendRequestToSuperior({
         ...request,
         requester: { firstName: req.user!.firstName, lastName: req.user!.lastName, email: req.user!.email },
-        type: { name: type.name },
+        type,
       });
     } catch (err) {
       console.error('Superior email error:', (err as Error).message);

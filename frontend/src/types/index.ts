@@ -188,6 +188,14 @@ export const COLUMN_TYPES: ColumnTypeMeta[] = [
 ];
 
 // === Dashboard Stats ===
+export interface RequestField {
+  key: string;
+  label: string;
+  type: 'text' | 'textarea' | 'number' | 'date' | 'select';
+  required: boolean;
+  options?: string[];
+}
+
 export interface Document {
   id: string;
   title: string;
