@@ -14,6 +14,10 @@ import FormSubmissions from './pages/FormSubmissions';
 import Backups from './pages/Backups';
 import Landing from './pages/Landing';
 import Documents from './pages/Documents';
+import Requests from './pages/Requests';
+import RequestTypesAdmin from './pages/RequestTypesAdmin';
+import ReviewRequest from './pages/ReviewRequest';
+import EmailAccounts from './pages/EmailAccounts';
 
 function Spinner() {
   return (
@@ -79,8 +83,12 @@ export default function App() {
         <Route path="tables/:tableId/forms/:formId" element={<FormBuilder />} />
         <Route path="tables/:tableId/forms/:formId/submissions" element={<FormSubmissions />} />
         <Route path="documents" element={<Documents />} />
+        <Route path="requests" element={<Requests />} />
+        <Route path="requests/types" element={<RequestTypesAdmin />} />
+        <Route path="email-accounts" element={<EmailAccounts />} />
       </Route>
       <Route path="/forms/:token" element={<PublicForm />} />
+      <Route path="/requests/review/:token" element={<ReviewRequest />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -10,6 +10,8 @@ import {
   ChevronLeft,
   HardDrive,
   FileText,
+  ClipboardList,
+  Mail,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -18,12 +20,15 @@ import clsx from 'clsx';
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Tableau de bord', end: true },
   { to: '/tables', icon: Table2, label: 'Tableaux', end: true },
+  { to: '/requests', icon: ClipboardList, label: 'Demandes', end: true },
   { to: '/backups', icon: HardDrive, label: 'Sauvegardes', end: true },
 ];
 
 const adminItems = [
   { to: '/users', icon: Users, label: 'Utilisateurs' },
   { to: '/documents', icon: FileText, label: 'Documents' },
+  { to: '/requests/types', icon: ClipboardList, label: 'Types de demande' },
+  { to: '/email-accounts', icon: Mail, label: 'Comptes email' },
 ];
 
 export default function Sidebar({

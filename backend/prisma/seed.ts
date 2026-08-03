@@ -49,6 +49,34 @@ async function main() {
     },
   });
 
+  // Default request types
+  const requestTypes = [
+    { name: 'Création de profil', description: 'Création d\'un compte utilisateur sur la plateforme' },
+    { name: 'Réinitialisation de mot de passe', description: 'Réinitialisation d\'un mot de passe oublié' },
+    { name: 'Accès à une application', description: 'Demande d\'accès à une application ou un service' },
+    { name: 'Autre demande', description: 'Toute autre demande nécessitant une validation' },
+  ];
+  for (const rt of requestTypes) {
+    await prisma.requestType.upsert({
+      where: { name: rt.name },
+      update: {},
+      create: rt,
+    });
+  }
+
+  // Default system settings
+  const defaultSettings: Record<string, string> = {
+    NOTIFICATION_EMAIL: 'admin@example.com',
+    FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:8888',
+  };
+  for (const [key, value] of Object.entries(defaultSettings)) {
+    await prisma.systemSetting.upsert({
+      where: { key },
+      update: {},
+      create: { key, value },
+    });
+  }
+
   console.log('Seed completed successfully!');
   console.log('Admin: admin@example.com / admin123');
   console.log('Editor: editor@example.com / editor123');

@@ -78,6 +78,8 @@ model User {
   backups        Backup[]
   backupSettings BackupSettings?
   documents      Document[]
+  requests       Request[]        @relation("RequestRequester")
+  approvedRequests Request[]      @relation("RequestApprover")
 
   @@map("users")
 }
@@ -344,4 +346,92 @@ model Document {
   creator User @relation(fields: [createdBy], references: [id])
 
   @@map("documents")
+}
+
+enum EmailProvider {
+  OUTLOOK
+  GMAIL
+  IMAP_SMTP
+}
+
+// Configuration de boîte mail (Outlook/Microsoft 365 via Graph API, ou SMTP générique)
+model EmailAccount {
+  id           String        @id @default(uuid())
+  label        String
+  provider     EmailProvider @default(OUTLOOK)
+  emailAddress String
+
+  // OAuth2 (Outlook / Gmail)
+  clientId     String?
+  clientSecret String?
+  tenantId     String?
+  refreshToken String?
+
+  // IMAP/SMTP générique
+  imapHost     String?
+  imapPort     Int?
+  smtpHost     String?
+  smtpPort     Int?
+  username     String?
+  password     String?
+  useTls       Boolean       @default(true)
+
+  isActive     Boolean       @default(true)
+  isDefault    Boolean       @default(false)
+
+  lastSyncAt   DateTime?
+  deltaLink    String?
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("email_accounts")
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model RequestType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requests Request[]
+
+  @@map("request_types")
+}
+
+model Request {
+  id             String        @id @default(uuid())
+  typeId         String
+  requesterId    String
+  superiorEmail  String
+  details        String?
+  status         RequestStatus @default(PENDING)
+  decisionToken  String        @unique @default(uuid())
+  decidedBy      String?
+  decidedAt      DateTime?
+  decisionComment String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  type      RequestType @relation(fields: [typeId], references: [id])
+  requester User        @relation("RequestRequester", fields: [requesterId], references: [id])
+  approver  User?       @relation("RequestApprover", fields: [decidedBy], references: [id])
+
+  @@map("requests")
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String?
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
 }

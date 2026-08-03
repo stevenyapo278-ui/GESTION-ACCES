@@ -15,6 +15,9 @@ import formRoutes from './routes/forms';
 import prisma from './lib/prisma';
 import backupRoutes, { runAutoBackup } from './routes/backup';
 import documentRoutes from './routes/documents';
+import emailAccountRoutes from './routes/emailAccounts';
+import outlookOAuthRoutes from './routes/outlookOAuth';
+import requestRoutes from './routes/requests';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -42,6 +45,9 @@ app.use('/api/users', userRoutes);
 app.use('/api/forms', formRoutes);
 app.use('/api/backups', backupRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/email-accounts', emailAccountRoutes);
+app.use('/api/oauth', outlookOAuthRoutes);
+app.use('/api/requests', requestRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

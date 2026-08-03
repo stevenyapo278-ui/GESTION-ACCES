@@ -240,3 +240,35 @@ export const documentsAPI = {
   delete: (id: string) => api.delete(`/documents/${id}`),
 };
 
+// === Requests API (demandes de validation) ===
+export const requestsAPI = {
+  create: (data: { typeId: string; superiorEmail: string; details?: string }) =>
+    api.post('/requests', data),
+  mine: () => api.get('/requests/mine'),
+  list: (params?: { status?: string }) => api.get('/requests', { params }),
+  getReview: (token: string) => axios.get(`/api/requests/review/${token}`),
+  decide: (token: string, data: { action: 'APPROVE' | 'REJECT'; comment?: string }) =>
+    axios.post(`/api/requests/review/${token}`, data),
+  types: {
+    list: () => api.get('/requests/types'),
+    listAll: () => api.get('/requests/types/all'),
+    create: (data: { name: string; description?: string }) => api.post('/requests/types', data),
+    update: (id: string, data: any) => api.put(`/requests/types/${id}`, data),
+    delete: (id: string) => api.delete(`/requests/types/${id}`),
+  },
+};
+
+// === Email Accounts API ===
+export const emailAccountsAPI = {
+  list: () => api.get('/email-accounts'),
+  create: (data: any) => api.post('/email-accounts', data),
+  update: (id: string, data: any) => api.put(`/email-accounts/${id}`, data),
+  delete: (id: string) => api.delete(`/email-accounts/${id}`),
+  oauthConnect: (id: string) => api.get(`/email-accounts/${id}/oauth/connect`),
+  settings: {
+    get: () => api.get('/email-accounts/settings'),
+    update: (data: { notificationEmail?: string; frontendUrl?: string }) =>
+      api.put('/email-accounts/settings', data),
+  },
+};
+

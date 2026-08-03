@@ -67,9 +67,16 @@ npm run dev                    # Vite on :5173, proxies /api -> :3001
 ## API routes
 
 All under `/api/`:
-`auth`, `tables`, `columns`, `rows`, `views`, `upload`, `search`, `export`, `import`, `analytics`, `users`, `forms`, `backups`, `documents`.
+`auth`, `tables`, `columns`, `rows`, `views`, `upload`, `search`, `export`, `import`, `analytics`, `users`, `forms`, `backups`, `documents`, `email-accounts`, `oauth`, `requests`.
 
 JWT auth via `Authorization: Bearer <token>` header. Three roles (ADMIN > EDITOR > READER). Table-level permissions checked in `middleware/auth.ts`.
+
+## Demandes (workflow de validation)
+
+- **Module email** (`src/services/emailSender.ts` + `graphClient.ts`) : envoi via Microsoft Graph API (OAuth2 Outlook/M365) ou fallback SMTP nodemailer. Comptes configurés en base (`EmailAccount`, page admin "Comptes email"). Sélection : OUTLOOK par défaut → OUTLOOK → SMTP par défaut → SMTP.
+- **Flux demande** : utilisateur connecté crée une demande (`POST /api/requests`, type + email du supérieur) → email au supérieur avec lien public `/requests/review/:token` (boutons Valider/Refuser, idempotent) → décision notifiée à `NOTIFICATION_EMAIL` (setting en base, page "Comptes email").
+- **Settings email** en base (`SystemSetting` : `NOTIFICATION_EMAIL`, `FRONTEND_URL`), fallback `.env`.
+- OAuth callback Microsoft : `/api/oauth/outlook/callback` (proxy nginx `/api/` → backend).
 
 ## Architecture notes
 
