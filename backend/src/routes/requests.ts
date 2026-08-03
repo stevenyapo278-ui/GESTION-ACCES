@@ -32,6 +32,26 @@ const publicRequestLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Applique la décision (approbation/refus) sur une demande PENDING
+async function applyDecision(
+  request: { id: string; status: RequestStatus },
+  action: 'APPROVE' | 'REJECT',
+  comment?: string
+) {
+  if (request.status !== RequestStatus.PENDING) {
+    throw Object.assign(new Error('Cette demande a déjà reçu une réponse'), { status: 409, requestStatus: request.status });
+  }
+
+  return prisma.request.update({
+    where: { id: request.id },
+    data: {
+      status: action === 'APPROVE' ? RequestStatus.APPROVED : RequestStatus.REJECTED,
+      decidedAt: new Date(),
+      decisionComment: comment || null,
+    },
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC ROUTES (no auth required — lien de décision envoyé par email)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -99,14 +119,7 @@ router.post('/review/:token', async (req: Request, res: Response) => {
       return;
     }
 
-    const updated = await prisma.request.update({
-      where: { id: request.id },
-      data: {
-        status: action === 'APPROVE' ? RequestStatus.APPROVED : RequestStatus.REJECTED,
-        decidedAt: new Date(),
-        decisionComment: comment || null,
-      },
-    });
+    const updated = await applyDecision(request, action as 'APPROVE' | 'REJECT', comment);
 
     // Notifier l'équipe par email (échec d'envoi non bloquant)
     try {
@@ -319,6 +332,75 @@ router.get('/mine', authenticate, async (req: AuthRequest, res: Response) => {
     res.json(requests);
   } catch (error) {
     console.error('List my requests error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/requests/to-review — Demandes PENDING envoyées à l'utilisateur connecté (supérieur)
+router.get('/to-review', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const requests = await prisma.request.findMany({
+      where: { superiorEmail: req.user!.email, status: RequestStatus.PENDING },
+      include: {
+        type: { select: { name: true, fields: true } },
+        requester: { select: { firstName: true, lastName: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(requests);
+  } catch (error) {
+    console.error('List requests to review error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /api/requests/decide/:id — Valider/refuser une demande reçue (supérieur connecté)
+router.post('/decide/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { action, comment } = req.body;
+    if (!['APPROVE', 'REJECT'].includes(action)) {
+      res.status(400).json({ error: 'Action invalide' });
+      return;
+    }
+
+    const request = await prisma.request.findUnique({
+      where: { id: req.params.id },
+      include: {
+        type: { select: { name: true, fields: true } },
+        requester: { select: { firstName: true, lastName: true, email: true } },
+      },
+    });
+
+    if (!request) {
+      res.status(404).json({ error: 'Demande introuvable' });
+      return;
+    }
+
+    if (request.superiorEmail.toLowerCase() !== req.user!.email.toLowerCase()) {
+      res.status(403).json({ error: 'Cette demande ne vous a pas été adressée' });
+      return;
+    }
+
+    if (request.status !== RequestStatus.PENDING) {
+      res.status(409).json({ error: 'Cette demande a déjà reçu une réponse', status: request.status });
+      return;
+    }
+
+    const updated = await applyDecision(request, action as 'APPROVE' | 'REJECT', comment);
+
+    try {
+      await sendRequestDecisionToAdmin({
+        ...updated,
+        requester: request.requester,
+        type: request.type,
+      });
+    } catch (err) {
+      console.error('Notification email error:', (err as Error).message);
+    }
+
+    res.json({ message: action === 'APPROVE' ? 'Demande validée' : 'Demande refusée', status: updated.status });
+  } catch (error) {
+    console.error('Decide request error:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

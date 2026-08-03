@@ -246,10 +246,13 @@ export const requestsAPI = {
   create: (data: { typeId: string; superiorEmail: string; details?: string; data?: Record<string, string> }) =>
     api.post('/requests', data),
   mine: () => api.get('/requests/mine'),
-  list: (params?: { status?: string }) => api.get('/requests', { params }),
-  getReview: (token: string) => axios.get(`/api/requests/review/${token}`),
+  toReview: () => api.get('/requests/to-review'),
   decide: (token: string, data: { action: 'APPROVE' | 'REJECT'; comment?: string }) =>
     axios.post(`/api/requests/review/${token}`, data),
+  decideById: (id: string, data: { action: 'APPROVE' | 'REJECT'; comment?: string }) =>
+    api.post(`/requests/decide/${id}`, data),
+  list: (params?: { status?: string }) => api.get('/requests', { params }),
+  getReview: (token: string) => axios.get(`/api/requests/review/${token}`),
   types: {
     list: () => api.get('/requests/types'),
     listAll: () => api.get('/requests/types/all'),

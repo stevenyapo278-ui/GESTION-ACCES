@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Send, Loader2, Clock, CheckCircle2, XCircle, Inbox, ClipboardList } from 'lucide-react';
+import { Send, Loader2, Clock, CheckCircle2, XCircle, Inbox, ClipboardList, ShieldCheck } from 'lucide-react';
 import { requestsAPI } from '../services/api';
 import type { RequestField } from '../types';
 import toast from 'react-hot-toast';
@@ -16,6 +16,8 @@ interface RequestItem {
   id: string;
   typeId: string;
   superiorEmail: string;
+  requesterName?: string;
+  requesterEmail?: string;
   details?: string;
   data?: Record<string, string>;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -41,9 +43,11 @@ function answerSummary(r: RequestItem): string {
 
 export default function Requests() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'new' | 'mine'>('new');
+  const [tab, setTab] = useState<'new' | 'mine' | 'review'>('new');
   const [form, setForm] = useState({ typeId: '', superiorEmail: '', details: '' });
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
+  const [reviewBusy, setReviewBusy] = useState<Record<string, string | null>>({});
 
   const { data: types, isLoading: typesLoading } = useQuery<RequestType[]>({
     queryKey: ['request-types'],
@@ -56,6 +60,12 @@ export default function Requests() {
     queryKey: ['my-requests'],
     queryFn: async () => (await requestsAPI.mine()).data,
     enabled: tab === 'mine',
+  });
+
+  const { data: reviewRequests, isLoading: reviewLoading } = useQuery<RequestItem[]>({
+    queryKey: ['to-review'],
+    queryFn: async () => (await requestsAPI.toReview()).data,
+    enabled: tab === 'review',
   });
 
   const createMutation = useMutation({
@@ -84,6 +94,18 @@ export default function Requests() {
     createMutation.mutate();
   };
 
+  const decideById = (requestId: string, action: 'APPROVE' | 'REJECT') => {
+    setReviewBusy((prev) => ({ ...prev, [requestId]: action }));
+    requestsAPI
+      .decideById(requestId, { action, comment: (reviewComments[requestId] || '').trim() || undefined })
+      .then(() => {
+        toast.success(action === 'APPROVE' ? 'Demande validée' : 'Demande refusée');
+        queryClient.invalidateQueries({ queryKey: ['to-review'] });
+      })
+      .catch((err) => toast.error(err.response?.data?.error || 'Erreur lors de la décision'))
+      .finally(() => setReviewBusy((prev) => ({ ...prev, [requestId]: null })));
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -107,6 +129,19 @@ export default function Requests() {
           }`}
         >
           <ClipboardList className="size-4" /> Mes demandes
+        </button>
+        <button
+          onClick={() => setTab('review')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            tab === 'review' ? 'bg-accent-blue/15 text-accent-blue' : 'text-zinc-500 hover:bg-white/5'
+          }`}
+        >
+          <ShieldCheck className="size-4" /> À valider
+          {reviewRequests && reviewRequests.length > 0 && tab !== 'review' && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400">
+              {reviewRequests.length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -238,6 +273,70 @@ export default function Requests() {
             <div className="flex flex-col items-center justify-center h-40 text-zinc-500">
               <Inbox className="size-8 mb-2 opacity-50" />
               <p className="text-sm">Aucune demande pour le moment.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'review' && (
+        <div className="card overflow-hidden">
+          {reviewLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="size-8 border-2 border-accent-blue border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : reviewRequests && reviewRequests.length > 0 ? (
+            <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+              {reviewRequests.map((r) => (
+                <div key={r.id} className="p-5 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="font-semibold" style={{ color: 'var(--text-primary)' }}>{r.type.name}</h4>
+                      <p className="text-sm text-zinc-500 mt-0.5">
+                        <span className="font-medium text-zinc-300">{r.requesterName || '—'}</span>
+                        {r.requesterEmail ? ` (${r.requesterEmail})` : ''} ·{' '}
+                        {new Date(r.createdAt).toLocaleString('fr-FR')}
+                      </p>
+                      {r.data && (
+                        <p className="text-sm text-zinc-400 mt-1 max-w-xl">
+                          {answerSummary(r)}
+                        </p>
+                      )}
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-500">
+                      <Clock className="size-3.5" /> En attente
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      className="input flex-1 min-w-40"
+                      placeholder="Commentaire (optionnel)"
+                      value={reviewComments[r.id] || ''}
+                      onChange={(e) => setReviewComments({ ...reviewComments, [r.id]: e.target.value })}
+                    />
+                    <button
+                      onClick={() => decideById(r.id, 'APPROVE')}
+                      disabled={!!reviewBusy[r.id]}
+                      className="btn-primary !bg-emerald-600 hover:!bg-emerald-700 disabled:opacity-50"
+                    >
+                      {reviewBusy[r.id] === 'APPROVE' ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                      Valider
+                    </button>
+                    <button
+                      onClick={() => decideById(r.id, 'REJECT')}
+                      disabled={!!reviewBusy[r.id]}
+                      className="btn-primary !bg-red-600 hover:!bg-red-700 disabled:opacity-50"
+                    >
+                      {reviewBusy[r.id] === 'REJECT' ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
+                      Refuser
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-40 text-zinc-500">
+              <ShieldCheck className="size-8 mb-2 opacity-50" />
+              <p className="text-sm">Aucune demande à valider pour le moment.</p>
             </div>
           )}
         </div>
