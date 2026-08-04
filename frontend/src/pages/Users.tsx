@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Plus, Loader2, ShieldAlert, ShieldCheck, Shield, ToggleRight, ToggleLeft } from 'lucide-react';
+import { Plus, Loader2, ShieldAlert, ShieldCheck, Shield, ToggleRight, ToggleLeft, Trash2 } from 'lucide-react';
 import { usersAPI } from '../services/api';
 import type { User, Role } from '../types';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import ConfirmModal from '../components/ui/ConfirmModal';
 
 const roleConfig: Record<Role, { label: string; icon: React.ElementType; color: string }> = {
   ADMIN: { label: 'Administrateur', icon: ShieldAlert, color: 'text-gold-400 bg-gold-400/10' },
@@ -33,6 +34,20 @@ export default function Users() {
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => usersAPI.update(id, { isActive: !isActive }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
     onError: (err: any) => toast.error(err.response?.data?.error || 'Erreur'),
+  });
+
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => usersAPI.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Utilisateur supprimé');
+      setUserToDelete(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || "Impossible de supprimer l'utilisateur");
+      setUserToDelete(null);
+    },
   });
 
   if (isLoading) {
@@ -141,16 +156,27 @@ export default function Users() {
                     </td>
                     <td className="px-5 py-4 text-sm text-zinc-500">{(user as any)._count?.createdTables ?? 0}</td>
                     <td className="px-5 py-4">
-                      {user.id !== currentUser?.id && (
-                        <button
-                          onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: user.isActive ?? true })}
-                          className={`p-1.5 rounded transition-colors ${
-                            user.isActive !== false ? 'text-zinc-500 hover:text-red-400 hover:bg-red-500/10' : 'text-zinc-500 hover:text-accent-green hover:bg-green-500/10'
-                          }`}
-                        >
-                          {user.isActive !== false ? <ToggleRight className="size-4" /> : <ToggleLeft className="size-4" />}
-                        </button>
-                      )}
+                      <div className="flex items-center justify-end gap-1">
+                        {user.id !== currentUser?.id && (
+                          <>
+                            <button
+                              onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: user.isActive ?? true })}
+                              className={`p-1.5 rounded transition-colors ${
+                                user.isActive !== false ? 'text-zinc-500 hover:text-red-400 hover:bg-red-500/10' : 'text-zinc-500 hover:text-accent-green hover:bg-green-500/10'
+                              }`}
+                            >
+                              {user.isActive !== false ? <ToggleRight className="size-4" /> : <ToggleLeft className="size-4" />}
+                            </button>
+                            <button
+                              onClick={() => setUserToDelete(user)}
+                              className="p-1.5 rounded text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -159,6 +185,20 @@ export default function Users() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        open={!!userToDelete}
+        title="Supprimer l'utilisateur"
+        message={
+          userToDelete
+            ? `Supprimer définitivement ${userToDelete.firstName} ${userToDelete.lastName} (${userToDelete.email}) ? Ses tableaux et documents seront transférés à votre compte, mais cette action est irréversible.`
+            : ''
+        }
+        confirmLabel="Supprimer"
+        loading={deleteMutation.isPending}
+        onConfirm={() => userToDelete && deleteMutation.mutate(userToDelete.id)}
+        onCancel={() => setUserToDelete(null)}
+      />
     </div>
   );
 }
