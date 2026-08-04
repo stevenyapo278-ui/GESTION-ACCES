@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Send, Loader2, Clock, CheckCircle2, XCircle, Inbox, ClipboardList, ShieldCheck, Users, Filter } from 'lucide-react';
-import { requestsAPI, publicRequestsAPI } from '../services/api';
+import { requestsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { RequestField } from '../types';
 import toast from 'react-hot-toast';
@@ -62,13 +62,6 @@ export default function Requests() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
   const [reviewBusy, setReviewBusy] = useState<Record<string, string | null>>({});
-  const [superiorEmails, setSuperiorEmails] = useState<string[]>([]);
-
-  useEffect(() => {
-    publicRequestsAPI.superiors()
-      .then((res) => setSuperiorEmails(res.data.emails || []))
-      .catch(() => {});
-  }, []);
 
   const { data: types, isLoading: typesLoading } = useQuery<RequestType[]>({
     queryKey: ['request-types'],
@@ -206,17 +199,11 @@ export default function Requests() {
               <label className="label">Email du supérieur hiérarchique</label>
               <input
                 type="email"
-                list="superior-emails"
                 className="input"
                 placeholder="superieur@entreprise.com"
                 value={form.superiorEmail}
                 onChange={(e) => setForm({ ...form, superiorEmail: e.target.value })}
               />
-              <datalist id="superior-emails">
-                {superiorEmails.map((email) => (
-                  <option key={email} value={email} />
-                ))}
-              </datalist>
               <p className="text-xs text-zinc-500 mt-1">Un email avec les boutons Valider / Refuser sera envoyé à cette adresse.</p>
             </div>
             <div>

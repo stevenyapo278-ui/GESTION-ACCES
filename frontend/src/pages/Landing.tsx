@@ -50,7 +50,6 @@ export default function Landing() {
   const [types, setTypes] = useState<RequestType[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [contactEmail, setContactEmail] = useState('');
-  const [superiorEmails, setSuperiorEmails] = useState<string[]>([]);
   const [requestForm, setRequestForm] = useState({ typeId: '', requesterName: '', requesterEmail: '', superiorEmail: '', details: '' });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -69,9 +68,6 @@ export default function Landing() {
       .catch(() => {});
     publicRequestsAPI.contact()
       .then((res) => setContactEmail(res.data.notificationEmail || ''))
-      .catch(() => {});
-    publicRequestsAPI.superiors()
-      .then((res) => setSuperiorEmails(res.data.emails || []))
       .catch(() => {});
   }, []);
 
@@ -313,17 +309,11 @@ export default function Landing() {
                   <label className={`block text-sm font-medium mb-1.5 ${label}`}>Email du supérieur hiérarchique *</label>
                   <input
                     type="email"
-                    list="superior-emails"
                     className={inputClass}
                     placeholder="chef@entreprise.com"
                     value={requestForm.superiorEmail}
                     onChange={(e) => setRequestForm({ ...requestForm, superiorEmail: e.target.value })}
                   />
-                  <datalist id="superior-emails">
-                    {superiorEmails.map((email) => (
-                      <option key={email} value={email} />
-                    ))}
-                  </datalist>
                 </div>
                 <div className="md:col-span-2">
                   <label className={`block text-sm font-medium mb-1.5 ${label}`}>Détails (optionnel)</label>

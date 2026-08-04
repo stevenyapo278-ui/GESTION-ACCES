@@ -4,7 +4,7 @@ import { RequestStatus, Role } from '@prisma/client';
 import rateLimit from 'express-rate-limit';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { sendRequestToSuperior, sendRequestDecisionToAdmin, sendRequestDecisionToRequester } from '../services/emailSender';
-import { getNotificationEmail, getSuperiorEmails } from '../services/systemSettings';
+import { getNotificationEmail } from '../services/systemSettings';
 
 const router = Router();
 
@@ -171,16 +171,6 @@ router.get('/public/contact', async (_req: Request, res: Response) => {
     res.json({ notificationEmail: notificationEmail || '' });
   } catch (error) {
     console.error('Get public contact email error:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// GET /api/requests/public/superiors — Liste des supérieurs pour l'autocomplétion (public)
-router.get('/public/superiors', async (_req: Request, res: Response) => {
-  try {
-    res.json({ emails: await getSuperiorEmails() });
-  } catch (error) {
-    console.error('Get public superiors error:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

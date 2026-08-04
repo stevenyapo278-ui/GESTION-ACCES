@@ -26,17 +26,3 @@ export async function getNotificationEmail(): Promise<string> {
   if (stored) return stored;
   return process.env.NOTIFICATION_EMAIL || '';
 }
-
-// Liste des supérieurs hiérarchiques proposés en autocomplétion (un email par ligne ou virgules)
-export async function getSuperiorEmails(): Promise<string[]> {
-  const stored = await getSetting('SUPERIOR_EMAILS');
-  if (!stored) return [];
-  return stored
-    .split(/[\n,;]+/)
-    .map((e) => e.trim().toLowerCase())
-    .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
-}
-
-export async function setSuperiorEmails(emails: string): Promise<void> {
-  await setSetting('SUPERIOR_EMAILS', emails);
-}
