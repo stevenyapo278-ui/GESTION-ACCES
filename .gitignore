@@ -9,3 +9,4 @@ uploads/*
 .DS_Store
 *.tsbuildinfo
 motdepasse
+login_ldap 1
