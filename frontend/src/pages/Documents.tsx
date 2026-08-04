@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FileText, Upload, Trash2, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { documentsAPI } from '../services/api';
+import { useTheme } from '../contexts/ThemeContext';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import type { Document } from '../types';
@@ -14,6 +15,7 @@ function formatSize(bytes: number): string {
 
 export default function Documents() {
   const queryClient = useQueryClient();
+  const { isDark } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -76,7 +78,7 @@ export default function Documents() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Documents téléchargeables</h1>
+          <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>Documents téléchargeables</h1>
           <p className="text-sm text-zinc-400 mt-1">
             Gérez les formulaires PDF disponibles en téléchargement public
           </p>
@@ -167,7 +169,7 @@ export default function Documents() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-medium text-white truncate">{doc.title}</h3>
+                    <h3 className={`font-medium ${isDark ? 'text-white' : 'text-zinc-900'} truncate`}>{doc.title}</h3>
                     {!doc.isActive && (
                       <span className="badge bg-zinc-700 text-zinc-400 text-[10px]">
                         Inactif

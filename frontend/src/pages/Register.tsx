@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
+import { Loader2, Moon, Sun } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Register() {
   const { register } = useAuth();
+  const { toggleTheme, isDark } = useTheme();
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -31,7 +33,16 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-space-950">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-space-950 relative">
+      {/* Theme toggle */}
+      <button
+        onClick={toggleTheme}
+        className={`absolute top-4 right-4 z-10 flex items-center justify-center size-10 rounded-xl transition-colors ${
+          isDark ? 'hover:bg-space-800 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'
+        }`}
+      >
+        {isDark ? <Sun className="size-5" /> : <Moon className="size-5" />}
+      </button>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Créer un compte</h1>

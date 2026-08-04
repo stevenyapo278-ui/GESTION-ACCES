@@ -69,7 +69,7 @@ export default function Sidebar({
           </div>
           {(!collapsed || isMobile) && (
             <div className="min-w-0">
-              <h1 className="text-sm font-semibold text-white truncate">Gestions Access</h1>
+              <h1 className={`text-sm font-semibold truncate ${isDark ? 'text-white' : 'text-zinc-900'}`}>Gestions Access</h1>
               <p className="text-[10px] text-zinc-500 truncate">Table Builder</p>
             </div>
           )}
@@ -209,7 +209,7 @@ export default function Sidebar({
           </div>
           {(!collapsed || isMobile) && (
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold truncate text-zinc-200">
+              <p className={`text-xs font-semibold truncate ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
                 {user?.firstName} {user?.lastName}
               </p>
               <p className="text-[10px] text-zinc-500 truncate capitalize">{user?.role?.toLowerCase()}</p>
