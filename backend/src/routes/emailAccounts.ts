@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { EmailProvider } from '@prisma/client';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { Role } from '@prisma/client';
-import { resolveFrontendUrl, getNotificationEmail, setSetting } from '../services/systemSettings';
+import { resolveFrontendUrl, getNotificationEmail, getSuperiorEmails, setSuperiorEmails, setSetting } from '../services/systemSettings';
 
 const router = Router();
 
@@ -78,6 +78,7 @@ router.get('/settings', authenticate, authorize(Role.ADMIN), async (_req: AuthRe
     res.json({
       notificationEmail: await getNotificationEmail(),
       frontendUrl: await resolveFrontendUrl(),
+      superiorEmails: (await getSuperiorEmails()).join('\n'),
     });
   } catch (error) {
     console.error('Get email settings error:', error);
@@ -88,14 +89,21 @@ router.get('/settings', authenticate, authorize(Role.ADMIN), async (_req: AuthRe
 // PUT /api/email-accounts/settings — Update email-related settings (admin only)
 router.put('/settings', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
-    const { notificationEmail, frontendUrl } = req.body;
+    const { notificationEmail, frontendUrl, superiorEmails } = req.body;
     if (notificationEmail !== undefined) {
       await setSetting('NOTIFICATION_EMAIL', notificationEmail);
     }
     if (frontendUrl !== undefined) {
       await setSetting('FRONTEND_URL', frontendUrl);
     }
-    res.json({ notificationEmail: await getNotificationEmail(), frontendUrl: await resolveFrontendUrl() });
+    if (superiorEmails !== undefined) {
+      await setSuperiorEmails(superiorEmails);
+    }
+    res.json({
+      notificationEmail: await getNotificationEmail(),
+      frontendUrl: await resolveFrontendUrl(),
+      superiorEmails: (await getSuperiorEmails()).join('\n'),
+    });
   } catch (error) {
     console.error('Update email settings error:', error);
     res.status(500).json({ error: 'Échec de la mise à jour des réglages' });

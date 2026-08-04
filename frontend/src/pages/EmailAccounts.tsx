@@ -35,7 +35,7 @@ export default function EmailAccounts() {
   const [form, setForm] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<EmailAccount | null>(null);
   const [editForm, setEditForm] = useState<Record<string, string>>({});
-  const [settings, setSettings] = useState({ notificationEmail: '', frontendUrl: '' });
+  const [settings, setSettings] = useState({ notificationEmail: '', frontendUrl: '', superiorEmails: '' });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const { data: accounts, isLoading } = useQuery<EmailAccount[]>({
@@ -43,14 +43,18 @@ export default function EmailAccounts() {
     queryFn: async () => (await emailAccountsAPI.list()).data,
   });
 
-  const { data: settingsData } = useQuery<{ notificationEmail: string; frontendUrl: string }>({
+  const { data: settingsData } = useQuery<{ notificationEmail: string; frontendUrl: string; superiorEmails: string }>({
     queryKey: ['email-settings'],
     queryFn: async () => (await emailAccountsAPI.settings.get()).data,
   });
 
   useEffect(() => {
     if (settingsData && !settingsLoaded) {
-      setSettings({ notificationEmail: settingsData.notificationEmail || '', frontendUrl: settingsData.frontendUrl || '' });
+      setSettings({
+        notificationEmail: settingsData.notificationEmail || '',
+        frontendUrl: settingsData.frontendUrl || '',
+        superiorEmails: settingsData.superiorEmails || '',
+      });
       setSettingsLoaded(true);
     }
   }, [settingsData, settingsLoaded]);
@@ -422,7 +426,7 @@ export default function EmailAccounts() {
 
       <div className="card p-5">
         <h3 className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Réglages email</h3>
-        <p className="text-xs text-zinc-500 mb-4">Adresse qui reçoit les décisions, et URL publique de l'application (liens de validation).</p>
+        <p className="text-xs text-zinc-500 mb-4">Adresse qui reçoit les décisions, URL publique de l'application, et liste des supérieurs proposés en autocomplétion.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="label">Email de notification (équipe)</label>
@@ -431,6 +435,16 @@ export default function EmailAccounts() {
           <div>
             <label className="label">URL publique du frontend</label>
             <input className="input" value={settings.frontendUrl} onChange={(e) => setSettings({ ...settings, frontendUrl: e.target.value })} placeholder={settingsData?.frontendUrl || 'http://localhost:8888'} />
+          </div>
+          <div className="md:col-span-2">
+            <label className="label">Supérieurs hiérarchiques (un email par ligne — autocomplétion)</label>
+            <textarea
+              className="input min-h-24 resize-y font-mono text-sm"
+              placeholder={'chef.direction@prosuma.ci\nresponsable.rh@prosuma.ci'}
+              value={settings.superiorEmails}
+              onChange={(e) => setSettings({ ...settings, superiorEmails: e.target.value })}
+            />
+            <p className="text-xs text-zinc-500 mt-1">Ces adresses apparaîtront en suggestions sur le champ « Email du supérieur hiérarchique » du formulaire de demande.</p>
           </div>
         </div>
         <button onClick={() => settingsMutation.mutate()} disabled={settingsMutation.isPending} className="btn-primary mt-4">

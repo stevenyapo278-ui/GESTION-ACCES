@@ -266,6 +266,7 @@ export const requestsAPI = {
 export const publicRequestsAPI = {
   types: () => axios.get('/api/requests/types/public'),
   contact: () => axios.get('/api/requests/public/contact'),
+  superiors: () => axios.get('/api/requests/public/superiors'),
   create: (data: { typeId: string; superiorEmail: string; requesterName: string; requesterEmail: string; details?: string; data?: Record<string, string> }) =>
     axios.post('/api/requests/public', data),
 };
@@ -279,7 +280,7 @@ export const emailAccountsAPI = {
   oauthConnect: (id: string) => api.get(`/email-accounts/${id}/oauth/connect`),
   settings: {
     get: () => api.get('/email-accounts/settings'),
-    update: (data: { notificationEmail?: string; frontendUrl?: string }) =>
+    update: (data: { notificationEmail?: string; frontendUrl?: string; superiorEmails?: string }) =>
       api.put('/email-accounts/settings', data),
   },
 };
