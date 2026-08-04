@@ -142,6 +142,35 @@ export async function sendRequestToSuperior(request: any): Promise<void> {
   await sendEmail({ to: request.superiorEmail, subject, bodyHtml });
 }
 
+// Email de notification au demandeur après la décision du supérieur
+export async function sendRequestDecisionToRequester(request: any): Promise<void> {
+  const requesterEmail = request.requesterEmail || request.requester?.email;
+  if (!requesterEmail) return;
+
+  const approved = request.status === 'APPROVED';
+  const typeName = request.type?.name || 'Demande';
+  const subject = approved
+    ? `✅ Votre demande a été validée — ${typeName}`
+    : `❌ Votre demande a été refusée — ${typeName}`;
+  const decisionBadge = approved
+    ? '<span style="background:#dcfce7;color:#166534;padding:4px 12px;border-radius:999px;font-weight:600">Validée</span>'
+    : '<span style="background:#fee2e2;color:#991b1b;padding:4px 12px;border-radius:999px;font-weight:600">Refusée</span>';
+  const bodyHtml = `
+  ${EMAIL_STYLE}
+  <div class="card">
+    <h2>Décision sur votre demande ${decisionBadge}</h2>
+    <p>Bonjour,</p>
+    <p>Voici la décision de votre supérieur concernant votre demande :</p>
+    ${detailTable(request)}
+    <table>
+      <tr><td>Supérieur</td><td>${request.superiorEmail}</td></tr>
+      ${request.decisionComment ? `<tr><td>Commentaire</td><td>${request.decisionComment}</td></tr>` : ''}
+      <tr><td>Décision le</td><td>${request.decidedAt ? new Date(request.decidedAt).toLocaleString('fr-FR') : '-'}</td></tr>
+    </table>
+  </div>`.trim();
+  await sendEmail({ to: requesterEmail, subject, bodyHtml });
+}
+
 // Email de notification à l'équipe après la décision du supérieur
 export async function sendRequestDecisionToAdmin(request: any): Promise<void> {
   const notificationEmail = await getNotificationEmail();

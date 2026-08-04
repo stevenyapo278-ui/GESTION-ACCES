@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Send, Loader2, Clock, CheckCircle2, XCircle, Inbox, ClipboardList, ShieldCheck } from 'lucide-react';
+import { Send, Loader2, Clock, CheckCircle2, XCircle, Inbox, ClipboardList, ShieldCheck, Users, Filter } from 'lucide-react';
 import { requestsAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import type { RequestField } from '../types';
 import toast from 'react-hot-toast';
 
@@ -18,6 +19,7 @@ interface RequestItem {
   superiorEmail: string;
   requesterName?: string;
   requesterEmail?: string;
+  requester?: { firstName: string; lastName: string; email: string };
   details?: string;
   data?: Record<string, string>;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -41,9 +43,21 @@ function answerSummary(r: RequestItem): string {
   return [answers, r.details].filter(Boolean).join(' · ') || '—';
 }
 
+function requesterDisplay(r: RequestItem): string {
+  if (r.requesterName) return r.requesterName;
+  if (r.requester) return `${r.requester.firstName} ${r.requester.lastName}`;
+  return '—';
+}
+
+function requesterEmail(r: RequestItem): string {
+  return r.requesterEmail || r.requester?.email || '—';
+}
+
 export default function Requests() {
+  const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'new' | 'mine' | 'review'>('new');
+  const [tab, setTab] = useState<'new' | 'mine' | 'review' | 'all'>('new');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [form, setForm] = useState({ typeId: '', superiorEmail: '', details: '' });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
@@ -66,6 +80,12 @@ export default function Requests() {
     queryKey: ['to-review'],
     queryFn: async () => (await requestsAPI.toReview()).data,
     enabled: tab === 'review',
+  });
+
+  const { data: allRequests, isLoading: allLoading } = useQuery<RequestItem[]>({
+    queryKey: ['all-requests', statusFilter],
+    queryFn: async () => (await requestsAPI.list({ status: statusFilter === 'ALL' ? undefined : statusFilter })).data,
+    enabled: tab === 'all' && isAdmin,
   });
 
   const createMutation = useMutation({
@@ -143,6 +163,16 @@ export default function Requests() {
             </span>
           )}
         </button>
+        {isAdmin && (
+          <button
+            onClick={() => setTab('all')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'all' ? 'bg-accent-blue/15 text-accent-blue' : 'text-zinc-500 hover:bg-white/5'
+            }`}
+          >
+            <Users className="size-4" /> Toutes les demandes
+          </button>
+        )}
       </div>
 
       {tab === 'new' && (
@@ -337,6 +367,78 @@ export default function Requests() {
             <div className="flex flex-col items-center justify-center h-40 text-zinc-500">
               <ShieldCheck className="size-8 mb-2 opacity-50" />
               <p className="text-sm">Aucune demande à valider pour le moment.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isAdmin && tab === 'all' && (
+        <div className="card overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
+            <div className="flex items-center gap-2">
+              <Filter className="size-4 text-zinc-500" />
+              <select
+                className="input !w-auto"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="ALL">Tous les statuts</option>
+                <option value="PENDING">En attente</option>
+                <option value="APPROVED">Validées</option>
+                <option value="REJECTED">Refusées</option>
+              </select>
+            </div>
+            <p className="text-xs text-zinc-500">{allRequests?.length ?? 0} demande(s)</p>
+          </div>
+          {allLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="size-8 border-2 border-accent-blue border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : allRequests && allRequests.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="table-wrap w-full">
+                <thead>
+                  <tr>
+                    <th className="px-5 py-3 text-left">Type</th>
+                    <th className="px-5 py-3 text-left">Demandeur</th>
+                    <th className="px-5 py-3 text-left">Supérieur</th>
+                    <th className="px-5 py-3 text-left">Détails</th>
+                    <th className="px-5 py-3 text-left">Date</th>
+                    <th className="px-5 py-3 text-left">Statut</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                  {allRequests.map((r) => {
+                    const s = statusConfig[r.status];
+                    const Icon = s.icon;
+                    return (
+                      <tr key={r.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-5 py-4 font-medium" style={{ color: 'var(--text-primary)' }}>{r.type.name}</td>
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{requesterDisplay(r)}</p>
+                          <p className="text-xs text-zinc-500">{requesterEmail(r)}</p>
+                        </td>
+                        <td className="px-5 py-4 text-sm text-zinc-500">{r.superiorEmail}</td>
+                        <td className="px-5 py-4 text-sm text-zinc-400 max-w-xs truncate">{answerSummary(r)}</td>
+                        <td className="px-5 py-4 text-sm text-zinc-500">{new Date(r.createdAt).toLocaleDateString('fr-FR')}</td>
+                        <td className="px-5 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${s.color}`}>
+                            <Icon className="size-3.5" /> {s.label}
+                          </span>
+                          {r.decisionComment && (
+                            <p className="text-xs text-zinc-500 mt-1 max-w-40 truncate" title={r.decisionComment}>« {r.decisionComment} »</p>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-40 text-zinc-500">
+              <Inbox className="size-8 mb-2 opacity-50" />
+              <p className="text-sm">Aucune demande.</p>
             </div>
           )}
         </div>

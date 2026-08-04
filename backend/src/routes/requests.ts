@@ -3,7 +3,7 @@ import { Router, Request, Response } from 'express';
 import { RequestStatus, Role } from '@prisma/client';
 import rateLimit from 'express-rate-limit';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
-import { sendRequestToSuperior, sendRequestDecisionToAdmin } from '../services/emailSender';
+import { sendRequestToSuperior, sendRequestDecisionToAdmin, sendRequestDecisionToRequester } from '../services/emailSender';
 import { getNotificationEmail } from '../services/systemSettings';
 
 const router = Router();
@@ -121,7 +121,7 @@ router.post('/review/:token', async (req: Request, res: Response) => {
 
     const updated = await applyDecision(request, action as 'APPROVE' | 'REJECT', comment);
 
-    // Notifier l'équipe par email (échec d'envoi non bloquant)
+    // Notifier l'équipe et le demandeur par email (échec d'envoi non bloquant)
     try {
       await sendRequestDecisionToAdmin({
         ...updated,
@@ -130,6 +130,16 @@ router.post('/review/:token', async (req: Request, res: Response) => {
       });
     } catch (err) {
       console.error('Notification email error:', (err as Error).message);
+    }
+
+    try {
+      await sendRequestDecisionToRequester({
+        ...updated,
+        requester: request.requester,
+        type: request.type,
+      });
+    } catch (err) {
+      console.error('Requester notification email error:', (err as Error).message);
     }
 
     res.json({ message: action === 'APPROVE' ? 'Demande validée' : 'Demande refusée', status: updated.status });
@@ -396,6 +406,16 @@ router.post('/decide/:id', authenticate, async (req: AuthRequest, res: Response)
       });
     } catch (err) {
       console.error('Notification email error:', (err as Error).message);
+    }
+
+    try {
+      await sendRequestDecisionToRequester({
+        ...updated,
+        requester: request.requester,
+        type: request.type,
+      });
+    } catch (err) {
+      console.error('Requester notification email error:', (err as Error).message);
     }
 
     res.json({ message: action === 'APPROVE' ? 'Demande validée' : 'Demande refusée', status: updated.status });
