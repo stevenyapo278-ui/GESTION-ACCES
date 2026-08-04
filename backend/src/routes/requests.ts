@@ -1,7 +1,6 @@
 import prisma from '../lib/prisma';
 import { Router, Request, Response } from 'express';
 import { RequestStatus, Role } from '@prisma/client';
-import rateLimit from 'express-rate-limit';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { sendRequestToSuperior, sendRequestDecisionToAdmin, sendRequestDecisionToRequester } from '../services/emailSender';
 import { getNotificationEmail } from '../services/systemSettings';
@@ -23,14 +22,6 @@ function validateAnswers(type: { fields?: unknown }, data: unknown): Record<stri
   }
   return answers;
 }
-
-const publicRequestLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30,
-  message: { error: 'Trop de requêtes, veuillez réessayer dans quelques minutes.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 // Applique la décision (approbation/refus) sur une demande PENDING
 async function applyDecision(
@@ -171,71 +162,6 @@ router.get('/public/contact', async (_req: Request, res: Response) => {
     res.json({ notificationEmail: notificationEmail || '' });
   } catch (error) {
     console.error('Get public contact email error:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// POST /api/requests/public — Create a request without authentication (from landing page)
-router.post('/public', publicRequestLimiter, async (req: Request, res: Response) => {
-  try {
-    const { typeId, superiorEmail, requesterName, requesterEmail, details, data } = req.body;
-
-    if (!typeId) {
-      res.status(400).json({ error: 'Le type de demande est requis' });
-      return;
-    }
-    if (!requesterName || !requesterName.trim()) {
-      res.status(400).json({ error: 'Votre nom est requis' });
-      return;
-    }
-    if (!requesterEmail || !EMAIL_REGEX.test(requesterEmail)) {
-      res.status(400).json({ error: 'Votre adresse email est invalide' });
-      return;
-    }
-    if (!superiorEmail || !EMAIL_REGEX.test(superiorEmail)) {
-      res.status(400).json({ error: 'Adresse email du supérieur invalide' });
-      return;
-    }
-
-    const type = await prisma.requestType.findUnique({ where: { id: typeId } });
-    if (!type || !type.isActive) {
-      res.status(400).json({ error: 'Type de demande introuvable ou inactif' });
-      return;
-    }
-
-    let answers: Record<string, string>;
-    try {
-      answers = validateAnswers(type, data);
-    } catch (err) {
-      res.status(400).json({ error: (err as Error).message });
-      return;
-    }
-
-    const request = await prisma.request.create({
-      data: {
-        typeId,
-        requesterName: requesterName.trim(),
-        requesterEmail: requesterEmail.trim().toLowerCase(),
-        superiorEmail,
-        details: details || null,
-        data: answers,
-      },
-    });
-
-    try {
-      await sendRequestToSuperior({ ...request, type });
-    } catch (err) {
-      console.error('Superior email error (public):', (err as Error).message);
-      res.status(201).json({
-        ...request,
-        emailError: "La demande a été créée mais l'email au supérieur n'a pas pu être envoyé. Vérifiez la configuration du compte email.",
-      });
-      return;
-    }
-
-    res.status(201).json(request);
-  } catch (error) {
-    console.error('Create public request error:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

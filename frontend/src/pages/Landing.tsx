@@ -3,10 +3,6 @@ import {
   Database,
   ArrowRight,
   LogIn,
-  ClipboardList,
-  Send,
-  Loader2,
-  CheckCircle2,
   FileText,
   Download,
   Mail,
@@ -17,20 +13,10 @@ import {
   PenLine,
 } from 'lucide-react';
 import { publicRequestsAPI, documentsAPI } from '../services/api';
-import type { Document, RequestField } from '../types';
+import type { Document } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNavigate, Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
-
-interface RequestType {
-  id: string;
-  name: string;
-  description?: string;
-  fields?: RequestField[];
-}
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' o';
@@ -41,28 +27,19 @@ function formatSize(bytes: number): string {
 const GRID_PATTERN = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2394a3b8' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`;
 
 const STEPS = [
-  { icon: PenLine, title: 'Remplissez la demande', desc: 'Complétez le formulaire en ligne en quelques minutes, sans créer de compte.' },
+  { icon: PenLine, title: 'Remplissez la demande', desc: 'Connectez-vous puis complétez le formulaire en ligne en quelques minutes.' },
   { icon: ShieldCheck, title: 'Validation par email', desc: 'Votre supérieur reçoit un email avec les boutons Valider / Refuser.' },
   { icon: BellRing, title: 'Équipe notifiée', desc: 'L\'équipe est informée automatiquement de la décision, où qu\'elle soit.' },
 ];
 
 export default function Landing() {
-  const [types, setTypes] = useState<RequestType[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [contactEmail, setContactEmail] = useState('');
-  const [requestForm, setRequestForm] = useState({ typeId: '', requesterName: '', requesterEmail: '', superiorEmail: '', details: '' });
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const { user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  const selectedType = types.find((t) => t.id === requestForm.typeId);
 
   useEffect(() => {
-    publicRequestsAPI.types()
-      .then((res) => setTypes(res.data))
-      .catch(() => {});
     documentsAPI.list()
       .then((res) => setDocuments(res.data))
       .catch(() => {});
@@ -70,29 +47,6 @@ export default function Landing() {
       .then((res) => setContactEmail(res.data.notificationEmail || ''))
       .catch(() => {});
   }, []);
-
-  const submitRequest = () => {
-    if (!requestForm.typeId) return toast.error('Veuillez choisir un type de demande');
-    if (!requestForm.requesterName.trim()) return toast.error('Veuillez saisir votre nom');
-    if (!EMAIL_REGEX.test(requestForm.requesterEmail)) return toast.error('Votre adresse email est invalide');
-    if (!EMAIL_REGEX.test(requestForm.superiorEmail)) return toast.error('Adresse email du supérieur invalide');
-
-    for (const field of selectedType?.fields || []) {
-      const value = (answers[field.key] || '').trim();
-      if (field.required && value === '') {
-        return toast.error(`Le champ « ${field.label} » est requis`);
-      }
-    }
-
-    setSubmitting(true);
-    publicRequestsAPI.create({ ...requestForm, data: answers })
-      .then(() => {
-        setSubmitted(true);
-        toast.success('Demande envoyée. Votre supérieur va recevoir un email de validation.');
-      })
-      .catch((err) => toast.error(err.response?.data?.error || 'Erreur lors de l\'envoi'))
-      .finally(() => setSubmitting(false));
-  };
 
   // ─── Theme-aware class helpers ───────────────────────────────
   const heading = isDark ? 'text-white' : 'text-zinc-900';
@@ -102,19 +56,7 @@ export default function Landing() {
     ? 'bg-space-900/60 border-space-800/60'
     : 'bg-white border-zinc-200 shadow-sm';
   const softSection = isDark ? 'bg-space-900/30 border-y border-space-800/50' : 'bg-zinc-100/70 border-y border-zinc-200';
-  const inputClass = `w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all duration-200 placeholder:opacity-60 focus:ring-2 ${
-    isDark
-      ? 'bg-space-950/80 border-space-700/60 text-white placeholder-zinc-500 focus:border-gold-400/60 focus:ring-gold-400/20'
-      : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-gold-500/70 focus:ring-gold-400/25'
-  }`;
-  const label = isDark ? 'text-zinc-400' : 'text-zinc-600';
   const goldText = isDark ? 'text-gold-400' : 'text-gold-600';
-
-  const resetForm = () => {
-    setSubmitted(false);
-    setRequestForm({ typeId: '', requesterName: '', requesterEmail: '', superiorEmail: '', details: '' });
-    setAnswers({});
-  };
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-space-950' : 'bg-slate-50'} transition-colors duration-300`}>
@@ -175,26 +117,36 @@ export default function Landing() {
             isDark ? 'border-gold-400/30 bg-gold-400/10 text-gold-400' : 'border-gold-600/30 bg-gold-400/10 text-gold-600'
           }`}>
             <span className="size-1.5 rounded-full bg-current animate-pulse" />
-            Formulaire en ligne · Validation par email
+            Accès réservé aux utilisateurs · Validation par email
           </div>
 
           <h1 className={`text-4xl md:text-6xl font-bold ${heading} mb-6 animate-fade-in-up leading-[1.1]`}>
             Faites votre <span className="text-gradient">demande en ligne</span>
           </h1>
           <p className={`text-base md:text-lg ${body} max-w-2xl mx-auto animate-fade-in-up leading-relaxed`} style={{ animationDelay: '0.1s' }}>
-            Deux façons de faire votre demande : remplissez le formulaire en ligne — elle sera
+            Connectez-vous pour remplir le formulaire en ligne — votre demande sera
             transmise à votre supérieur hiérarchique qui la validera par email — ou téléchargez
             le formulaire, remplissez-le et transmettez-le nous par email.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4 mt-10 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            <a
-              href="#demande"
-              className="btn btn-primary text-sm"
-            >
-              <ClipboardList className="size-4" />
-              Faire une demande en ligne
-            </a>
+            {user ? (
+              <button
+                onClick={() => navigate('/')}
+                className="btn btn-primary text-sm"
+              >
+                <ArrowRight className="size-4" />
+                Accéder à l'application
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="btn btn-primary text-sm"
+              >
+                <LogIn className="size-4" />
+                Se connecter pour faire une demande
+              </Link>
+            )}
             <a
               href="#formulaires"
               className={`btn text-sm ${isDark ? 'btn-ghost' : 'border border-zinc-300 bg-white text-zinc-700 hover:border-gold-500/60 hover:text-gold-600'}`}
@@ -230,7 +182,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Request form (no login required) */}
+      {/* Demande en ligne (connexion requise) */}
       <section id="demande" className={`py-16 md:py-20 px-4 scroll-mt-16 transition-colors duration-300 ${softSection}`}>
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-10">
@@ -239,139 +191,58 @@ export default function Landing() {
               <span className={`text-xs font-semibold uppercase tracking-widest ${goldText}`}>Demande en ligne</span>
             </div>
             <h2 className={`text-3xl md:text-4xl font-bold ${heading}`}>
-              <span className="text-gradient">Faites votre demande</span> en 2 minutes
+              <span className="text-gradient">Connectez-vous</span> pour faire votre demande
             </h2>
             <p className={`${body} mt-3 max-w-xl mx-auto leading-relaxed`}>
-              Remplissez ce formulaire sans avoir de compte. Votre supérieur hiérarchique recevra un
-              email avec les boutons Valider / Refuser, et l'équipe sera notifiée de la décision.
+              La création de demande en ligne est réservée aux utilisateurs. Identifiez-vous
+              pour accéder au formulaire : votre supérieur hiérarchique recevra un email avec
+              les boutons Valider / Refuser, et l'équipe sera notifiée de la décision.
             </p>
           </div>
 
-          {submitted ? (
-            <div className={`rounded-2xl border p-10 text-center animate-fade-in ${
-              isDark ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-emerald-500/40 bg-emerald-50'
-            }`}>
-              <div className={`size-16 rounded-full flex items-center justify-center mx-auto mb-5 ${
-                isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'
-              }`}>
-                <CheckCircle2 className={`size-9 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
-              </div>
-              <h3 className={`text-xl font-semibold ${heading} mb-2`}>Demande envoyée !</h3>
-              <p className={`${body} max-w-md mx-auto leading-relaxed`}>
-                Votre demande a bien été transmise à <strong className={isDark ? 'text-white' : 'text-zinc-800'}>{requestForm.superiorEmail}</strong>.
-                Vous serez informé de la décision par votre supérieur.
-              </p>
-              <button
-                onClick={resetForm}
-                className="btn btn-primary text-sm mt-8"
-              >
-                Faire une autre demande
-              </button>
-            </div>
-          ) : (
-            <div className={`rounded-2xl border p-6 md:p-8 shadow-2xl transition-colors duration-300 ${
-              isDark ? 'bg-space-900/80 border-space-800/60 shadow-black/30' : 'bg-white border-zinc-200 shadow-zinc-200/60'
-            }`}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${label}`}>Votre nom complet *</label>
-                  <input
-                    className={inputClass}
-                    placeholder="Jean Dupont"
-                    value={requestForm.requesterName}
-                    onChange={(e) => setRequestForm({ ...requestForm, requesterName: e.target.value })}
-                  />
+          <div className={`rounded-2xl border p-10 text-center shadow-2xl transition-colors duration-300 ${
+            isDark ? 'bg-space-900/80 border-space-800/60 shadow-black/30' : 'bg-white border-zinc-200 shadow-zinc-200/60'
+          }`}>
+            {user ? (
+              <>
+                <div className={`size-16 rounded-full flex items-center justify-center mx-auto mb-5 ${
+                  isDark ? 'bg-gold-400/10' : 'bg-gold-50'
+                }`}>
+                  <ShieldCheck className={`size-8 ${goldText}`} />
                 </div>
-                <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${label}`}>Votre adresse email *</label>
-                  <input
-                    type="email"
-                    className={inputClass}
-                    placeholder="jean.dupont@entreprise.com"
-                    value={requestForm.requesterEmail}
-                    onChange={(e) => setRequestForm({ ...requestForm, requesterEmail: e.target.value })}
-                  />
+                <h3 className={`text-xl font-semibold ${heading} mb-2`}>Vous êtes connecté</h3>
+                <p className={`${body} max-w-md mx-auto leading-relaxed mb-8`}>
+                  Vous pouvez accéder au formulaire de demande depuis l'application.
+                </p>
+                <button
+                  onClick={() => navigate('/')}
+                  className="btn btn-primary text-sm"
+                >
+                  <ArrowRight className="size-4" />
+                  Accéder à l'application
+                </button>
+              </>
+            ) : (
+              <>
+                <div className={`size-16 rounded-full flex items-center justify-center mx-auto mb-5 ${
+                  isDark ? 'bg-gold-400/10' : 'bg-gold-50'
+                }`}>
+                  <LogIn className={`size-8 ${goldText}`} />
                 </div>
-                <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${label}`}>Type de demande *</label>
-                  <select
-                    className={`${inputClass} cursor-pointer`}
-                    value={requestForm.typeId}
-                    onChange={(e) => { setRequestForm({ ...requestForm, typeId: e.target.value }); setAnswers({}); }}
-                  >
-                    <option value="">— Choisir —</option>
-                    {types.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${label}`}>Email du supérieur hiérarchique *</label>
-                  <input
-                    type="email"
-                    className={inputClass}
-                    placeholder="chef@entreprise.com"
-                    value={requestForm.superiorEmail}
-                    onChange={(e) => setRequestForm({ ...requestForm, superiorEmail: e.target.value })}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className={`block text-sm font-medium mb-1.5 ${label}`}>Détails (optionnel)</label>
-                  <textarea
-                    className={`${inputClass} resize-y min-h-20`}
-                    placeholder="Précisez le contexte de votre demande..."
-                    value={requestForm.details}
-                    onChange={(e) => setRequestForm({ ...requestForm, details: e.target.value })}
-                  />
-                </div>
-                {selectedType?.fields?.map((field) => (
-                  <div key={field.key} className="md:col-span-2">
-                    <label className={`block text-sm font-medium mb-1.5 ${label}`}>
-                      {field.label} {field.required && <span className={goldText}>*</span>}
-                    </label>
-                    {field.type === 'textarea' ? (
-                      <textarea
-                        className={`${inputClass} resize-y min-h-20`}
-                        placeholder={field.label}
-                        value={answers[field.key] || ''}
-                        onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
-                      />
-                    ) : field.type === 'select' ? (
-                      <select
-                        className={`${inputClass} cursor-pointer`}
-                        value={answers[field.key] || ''}
-                        onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
-                      >
-                        <option value="">— Choisir —</option>
-                        {(field.options || []).map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                        className={inputClass}
-                        placeholder={field.label}
-                        value={answers[field.key] || ''}
-                        onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={submitRequest}
-                disabled={submitting}
-                className="btn btn-primary w-full mt-6"
-              >
-                {submitting ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-                Envoyer la demande
-              </button>
-              <p className={`text-xs text-center mt-3 ${muted}`}>
-                Une seule demande par envoi. Votre supérieur recevra un lien de validation à usage unique.
-              </p>
-            </div>
-          )}
+                <h3 className={`text-xl font-semibold ${heading} mb-2`}>Connexion requise</h3>
+                <p className={`${body} max-w-md mx-auto leading-relaxed mb-8`}>
+                  Utilisez votre identifiant habituel pour accéder au formulaire de demande en ligne.
+                </p>
+                <Link
+                  to="/login"
+                  className="btn btn-primary text-sm"
+                >
+                  <LogIn className="size-4" />
+                  Se connecter
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </section>
 
