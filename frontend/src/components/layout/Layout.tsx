@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { useState, useEffect, Suspense } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { Menu, X } from 'lucide-react';
+import { PageTransition, ContentLoader } from '../PageTransition';
 
 export default function Layout() {
   const { isDark } = useTheme();
+  const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('gestions-access-sidebar-collapsed') === 'true';
@@ -21,6 +23,11 @@ export default function Layout() {
       localStorage.setItem('gestions-access-sidebar-collapsed', String(sidebarCollapsed));
     } catch {}
   }, [sidebarCollapsed]);
+
+  // Scroll to top on navigation
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   // Lock scroll on mobile when sidebar is open
   useEffect(() => {
@@ -103,7 +110,11 @@ export default function Layout() {
         {/* Page content */}
         <main className="flex-1 min-w-0 relative">
           <div className="w-full p-5 lg:p-6">
-            <Outlet />
+            <Suspense fallback={<ContentLoader />}>
+              <PageTransition>
+                <Outlet />
+              </PageTransition>
+            </Suspense>
           </div>
         </main>
       </div>
