@@ -22,6 +22,9 @@ import {
   ChevronUp,
   Mail,
   X,
+  Check,
+  ArrowRight,
+  ArrowLeft,
 } from 'lucide-react';
 import { requestsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -58,6 +61,8 @@ const statusConfig: Record<RequestItem['status'], { label: string; dot: string }
 };
 
 const TYPE_ICONS = [FileText, KeyRound, UserPlus, Monitor, CreditCard, ShieldCheck, ClipboardList, Send];
+
+const WIZARD_STEPS = ['Type de demande', 'Détails', 'Récapitulatif'];
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -145,6 +150,7 @@ export default function Requests() {
   const [tab, setTab] = useState<'mine' | 'review' | 'all'>('mine');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [formOpen, setFormOpen] = useState(false);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [form, setForm] = useState({ typeId: '', superiorEmail: '', details: '' });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
@@ -191,6 +197,7 @@ export default function Requests() {
   const openForm = () => {
     setForm({ typeId: '', superiorEmail: '', details: '' });
     setAnswers({});
+    setStep(1);
     setFormOpen(true);
   };
 
@@ -224,6 +231,24 @@ export default function Requests() {
       }
     }
     createMutation.mutate();
+  };
+
+  const goNext = () => {
+    if (step === 1) {
+      if (!form.typeId) return toast.error('Veuillez choisir un type de demande');
+      setStep(2);
+      return;
+    }
+    if (!form.superiorEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.superiorEmail)) {
+      return toast.error('Adresse email du supérieur invalide');
+    }
+    for (const field of selectedType?.fields || []) {
+      const value = (answers[field.key] || '').trim();
+      if (field.required && value === '') {
+        return toast.error(`Le champ « ${field.label} » est requis`);
+      }
+    }
+    setStep(3);
   };
 
   const decideById = (requestId: string, action: 'APPROVE' | 'REJECT') => {
@@ -694,147 +719,251 @@ export default function Requests() {
               </button>
             </div>
 
+            {/* Indicateur d'étapes */}
+            <div className="px-6 pt-5 pb-2">
+              <div className="flex items-center px-1">
+                {WIZARD_STEPS.map((label, i) => {
+                  const n = (i + 1) as 1 | 2 | 3;
+                  const done = step > n;
+                  const current = step === n;
+                  return (
+                    <Fragment key={label}>
+                      {i > 0 && (
+                        <div className={`h-0.5 flex-1 mx-2 rounded-full transition-colors duration-300 ${done ? 'bg-gold-400/60' : 'bg-white/10'}`} />
+                      )}
+                      <div className="flex flex-col items-center gap-1.5 shrink-0">
+                        <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
+                          done || current
+                            ? 'bg-gradient-to-br from-gold-400 to-blue-500 text-white shadow-lg shadow-gold-400/25'
+                            : 'bg-white/10 text-zinc-500'
+                        }`}>
+                          {done ? <Check className="size-4" /> : n}
+                        </div>
+                        <span className={`text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap hidden sm:block transition-colors duration-300 ${
+                          current ? 'text-gold-400' : done ? 'text-zinc-300' : 'text-zinc-600'
+                        }`}>
+                          {label}
+                        </span>
+                      </div>
+                    </Fragment>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Corps */}
-            <div className="px-6 py-6 space-y-6 max-h-[calc(100vh-12rem)] overflow-y-auto">
-              <div>
-                <label className="label mb-2">Type de demande *</label>
-                {typesLoading ? (
-                  <div className="flex items-center justify-center gap-2 text-sm text-zinc-500 py-8">
-                    <Loader2 className="size-4 animate-spin" /> Chargement des types...
+            <div className="px-6 py-5 max-h-[calc(100vh-16rem)] overflow-y-auto">
+              <div key={step} className="step-enter space-y-6">
+                {/* Étape 1 — Type de demande */}
+                {step === 1 && (
+                  <div>
+                    <label className="label mb-2">Type de demande *</label>
+                    {typesLoading ? (
+                      <div className="flex items-center justify-center gap-2 text-sm text-zinc-500 py-10">
+                        <Loader2 className="size-4 animate-spin" /> Chargement des types...
+                      </div>
+                    ) : types && types.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {types.map((t, i) => {
+                          const selected = form.typeId === t.id;
+                          const Icon = TYPE_ICONS[i % TYPE_ICONS.length];
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => { setForm({ ...form, typeId: t.id }); setAnswers({}); }}
+                              className={`text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer group ${
+                                selected
+                                  ? 'border-transparent ring-2 ring-gold-400/70 bg-gradient-to-br from-gold-400/10 to-blue-500/10'
+                                  : 'hover:bg-white/[0.03]'
+                              }`}
+                              style={{ borderColor: selected ? undefined : 'var(--border-color)' }}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className={`size-9 rounded-lg flex items-center justify-center transition-colors ${
+                                  selected ? 'bg-gradient-to-br from-gold-400 to-blue-500' : 'bg-white/5 group-hover:bg-white/10'
+                                }`}>
+                                  <Icon className={`size-4 ${selected ? 'text-white' : 'text-zinc-400'}`} />
+                                </div>
+                                <span className={`size-4 rounded-full border-2 transition-colors ${
+                                  selected ? 'border-gold-400 bg-gold-400' : 'border-zinc-500'
+                                }`}>
+                                  {selected && <span className="block size-full rounded-full bg-white/70 scale-[0.35]" />}
+                                </span>
+                              </div>
+                              <p className="text-sm font-semibold mt-3" style={{ color: selected ? 'var(--text-primary)' : undefined }}>{t.name}</p>
+                              {t.description && (
+                                <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">{t.description}</p>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <EmptyState icon={Inbox} title="Aucun type de demande" hint="Contactez un administrateur pour créer un type de demande." />
+                    )}
                   </div>
-                ) : types && types.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {types.map((t, i) => {
-                      const selected = form.typeId === t.id;
-                      const Icon = TYPE_ICONS[i % TYPE_ICONS.length];
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => { setForm({ ...form, typeId: t.id }); setAnswers({}); }}
-                          className={`text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer group ${
-                            selected
-                              ? 'border-transparent ring-2 ring-gold-400/70 bg-gradient-to-br from-gold-400/10 to-blue-500/10'
-                              : 'hover:bg-white/[0.03]'
-                          }`}
-                          style={{ borderColor: selected ? undefined : 'var(--border-color)' }}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className={`size-9 rounded-lg flex items-center justify-center transition-colors ${
-                              selected ? 'bg-gradient-to-br from-gold-400 to-blue-500' : 'bg-white/5 group-hover:bg-white/10'
-                            }`}>
-                              <Icon className={`size-4 ${selected ? 'text-white' : 'text-zinc-400'}`} />
-                            </div>
-                            <span className={`size-4 rounded-full border-2 transition-colors ${
-                              selected ? 'border-gold-400 bg-gold-400' : 'border-zinc-500'
-                            }`}>
-                              {selected && <span className="block size-full rounded-full bg-white/70 scale-[0.35]" />}
-                            </span>
-                          </div>
-                          <p className="text-sm font-semibold mt-3" style={{ color: selected ? 'var(--text-primary)' : undefined }}>{t.name}</p>
-                          {t.description && (
-                            <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">{t.description}</p>
+                )}
+
+                {/* Étape 2 — Détails */}
+                {step === 2 && selectedType && (
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between rounded-xl border p-3" style={{ borderColor: 'var(--border-color)' }}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="size-9 rounded-lg bg-gradient-to-br from-gold-400 to-blue-500/80 flex items-center justify-center shrink-0">
+                          {(() => {
+                            const idx = types?.findIndex((t) => t.id === selectedType.id);
+                            const Icon = TYPE_ICONS[(idx ?? 0) % TYPE_ICONS.length];
+                            return <Icon className="size-4 text-white" />;
+                          })()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Type de demande</p>
+                          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{selectedType.name}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setStep(1)}
+                        className="text-xs font-semibold text-gold-400 hover:underline cursor-pointer shrink-0"
+                      >
+                        Modifier
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="sm:col-span-2">
+                        <label className="label">Email du supérieur hiérarchique *</label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-500" />
+                          <input
+                            type="email"
+                            className="input !pl-10"
+                            placeholder="superieur@entreprise.com"
+                            value={form.superiorEmail}
+                            onChange={(e) => setForm({ ...form, superiorEmail: e.target.value })}
+                          />
+                        </div>
+                        <p className="text-xs text-zinc-500 mt-1">Un email avec les boutons Valider / Refuser sera envoyé à cette adresse.</p>
+                      </div>
+
+                      {selectedType.fields?.map((field) => (
+                        <div key={field.key}>
+                          <label className="label">
+                            {field.label} {field.required && <span className="text-red-400">*</span>}
+                          </label>
+                          {field.type === 'textarea' ? (
+                            <textarea
+                              className="input min-h-20 resize-y"
+                              placeholder={field.label}
+                              value={answers[field.key] || ''}
+                              onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                            />
+                          ) : field.type === 'select' ? (
+                            <select
+                              className="input cursor-pointer"
+                              value={answers[field.key] || ''}
+                              onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                            >
+                              <option value="">— Choisir —</option>
+                              {(field.options || []).map((opt) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+                              className="input"
+                              placeholder={field.label}
+                              value={answers[field.key] || ''}
+                              onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                            />
                           )}
-                        </button>
-                      );
-                    })}
+                        </div>
+                      ))}
+
+                      <div className="sm:col-span-2">
+                        <label className="label">Détails (optionnel)</label>
+                        <textarea
+                          className="input min-h-24 resize-y"
+                          placeholder="Précisez le contexte de votre demande..."
+                          value={form.details}
+                          onChange={(e) => setForm({ ...form, details: e.target.value })}
+                        />
+                      </div>
+                    </div>
                   </div>
-                ) : (
-                  <EmptyState icon={Inbox} title="Aucun type de demande" hint="Contactez un administrateur pour créer un type de demande." />
+                )}
+
+                {/* Étape 3 — Récapitulatif */}
+                {step === 3 && selectedType && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="size-10 rounded-xl bg-gradient-to-br from-gold-400 to-blue-500 flex items-center justify-center shadow-lg shadow-gold-400/20">
+                        <Check className="size-5 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Vérifiez votre demande</h4>
+                        <p className="text-xs text-zinc-500">Validez les informations avant l'envoi.</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                      <div className="px-4 py-3 flex items-center justify-between border-b" style={{ borderColor: 'var(--border-color)', background: 'var(--bg-secondary)' }}>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{selectedType.name}</p>
+                        <button onClick={() => setStep(1)} className="text-xs font-semibold text-gold-400 hover:underline cursor-pointer">Modifier</button>
+                      </div>
+                      <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
+                        {[
+                          { label: 'Supérieur hiérarchique', value: form.superiorEmail },
+                          ...(selectedType.fields || []).map((f) => ({
+                            label: f.label,
+                            value: answers[f.key] || '—',
+                          })),
+                          ...(form.details ? [{ label: 'Détails', value: form.details }] : []),
+                        ].map((row) => (
+                          <div key={row.label} className="px-4 py-3 flex items-start justify-between gap-4">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 shrink-0 pt-0.5">{row.label}</p>
+                            <p className="text-sm text-right whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{row.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
-
-              {form.typeId && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
-                  <div className="sm:col-span-2">
-                    <label className="label">Email du supérieur hiérarchique *</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-500" />
-                      <input
-                        type="email"
-                        className="input !pl-10"
-                        placeholder="superieur@entreprise.com"
-                        value={form.superiorEmail}
-                        onChange={(e) => setForm({ ...form, superiorEmail: e.target.value })}
-                      />
-                    </div>
-                    <p className="text-xs text-zinc-500 mt-1">Un email avec les boutons Valider / Refuser sera envoyé à cette adresse.</p>
-                  </div>
-
-                  {selectedType?.fields?.map((field) => (
-                    <div key={field.key}>
-                      <label className="label">
-                        {field.label} {field.required && <span className="text-red-400">*</span>}
-                      </label>
-                      {field.type === 'textarea' ? (
-                        <textarea
-                          className="input min-h-20 resize-y"
-                          placeholder={field.label}
-                          value={answers[field.key] || ''}
-                          onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
-                        />
-                      ) : field.type === 'select' ? (
-                        <select
-                          className="input cursor-pointer"
-                          value={answers[field.key] || ''}
-                          onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
-                        >
-                          <option value="">— Choisir —</option>
-                          {(field.options || []).map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                          className="input"
-                          placeholder={field.label}
-                          value={answers[field.key] || ''}
-                          onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
-                        />
-                      )}
-                    </div>
-                  ))}
-
-                  <div className="sm:col-span-2">
-                    <label className="label">Détails (optionnel)</label>
-                    <textarea
-                      className="input min-h-24 resize-y"
-                      placeholder="Précisez le contexte de votre demande..."
-                      value={form.details}
-                      onChange={(e) => setForm({ ...form, details: e.target.value })}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Pied */}
-            {form.typeId && (
-              <div className="px-6 py-4 border-t flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
-                <p className="text-xs text-zinc-500 hidden sm:block">
-                  Votre supérieur recevra un lien de validation à usage unique.
-                </p>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={closeForm} className="btn-secondary cursor-pointer">Annuler</button>
-                  <button
-                    onClick={submit}
-                    disabled={createMutation.isPending}
-                    className="btn-primary cursor-pointer disabled:opacity-60 disabled:pointer-events-none"
-                  >
-                    {createMutation.isPending ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" /> Envoi...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="size-4" /> Envoyer la demande
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className="px-6 py-4 border-t flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
+              <button
+                onClick={step > 1 ? () => setStep((step - 1) as 1 | 2 | 3) : closeForm}
+                disabled={createMutation.isPending}
+                className="btn-secondary cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {step > 1 ? (<><ArrowLeft className="size-4" /> Précédent</>) : 'Annuler'}
+              </button>
+              {step < 3 ? (
+                <button onClick={goNext} className="btn-primary cursor-pointer">
+                  Continuer <ArrowRight className="size-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={submit}
+                  disabled={createMutation.isPending}
+                  className="btn-primary cursor-pointer disabled:opacity-60 disabled:pointer-events-none"
+                >
+                  {createMutation.isPending ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" /> Envoi...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="size-4" /> Envoyer la demande
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>,
         document.body
