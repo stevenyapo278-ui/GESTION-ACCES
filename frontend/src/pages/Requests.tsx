@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Send,
   Loader2,
@@ -662,9 +663,9 @@ export default function Requests() {
       )}
 
       {/* ─── Modal : Nouvelle demande ───────────────────────── */}
-      {formOpen && (
+      {formOpen && createPortal(
         <div
-          className="fixed inset-0 z-[70] flex items-start sm:items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center p-4 overflow-y-auto"
           onClick={closeForm}
         >
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
@@ -835,7 +836,8 @@ export default function Requests() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
