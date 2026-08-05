@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import {
   Send,
   Loader2,
@@ -20,7 +20,7 @@ import {
   ChevronDown,
   ChevronUp,
   Mail,
-  Sparkles,
+  X,
 } from 'lucide-react';
 import { requestsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -141,8 +141,9 @@ function EmptyState({ icon: Icon, title, hint }: { icon: React.ElementType; titl
 export default function Requests() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'new' | 'mine' | 'review' | 'all'>('new');
+  const [tab, setTab] = useState<'mine' | 'review' | 'all'>('mine');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState({ typeId: '', superiorEmail: '', details: '' });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
@@ -172,10 +173,36 @@ export default function Requests() {
     enabled: isAdmin,
   });
 
+  // Bloquer le scroll + fermeture par Échap quand le modal est ouvert
+  useEffect(() => {
+    if (!formOpen) return;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFormOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [formOpen]);
+
+  const openForm = () => {
+    setForm({ typeId: '', superiorEmail: '', details: '' });
+    setAnswers({});
+    setFormOpen(true);
+  };
+
+  const closeForm = () => {
+    if (createMutation.isPending) return;
+    setFormOpen(false);
+  };
+
   const createMutation = useMutation({
     mutationFn: () => requestsAPI.create({ ...form, data: answers }),
     onSuccess: () => {
       toast.success('Demande envoyée. Un email de validation a été adressé à votre supérieur.');
+      setFormOpen(false);
       setForm({ typeId: '', superiorEmail: '', details: '' });
       setAnswers({});
       queryClient.invalidateQueries({ queryKey: ['my-requests'] });
@@ -213,7 +240,6 @@ export default function Requests() {
   };
 
   const tabs: Array<{ key: typeof tab; label: string; icon: React.ElementType; badge?: number; show: boolean }> = [
-    { key: 'new', label: 'Nouvelle demande', icon: Send, show: true },
     { key: 'mine', label: 'Mes demandes', icon: ClipboardList, badge: myRequests?.length, show: true },
     { key: 'review', label: 'À valider', icon: ShieldCheck, badge: reviewRequests?.length, show: true },
     { key: 'all', label: 'Toutes les demandes', icon: Users, badge: allRequests?.length, show: isAdmin },
@@ -237,64 +263,78 @@ export default function Requests() {
             </p>
           </div>
         </div>
-        {reviewRequests && reviewRequests.length > 0 && (
-          <div className="flex items-center gap-2 rounded-xl border px-4 py-2.5 animate-fade-in"
-            style={{ borderColor: 'rgba(251,191,36,0.25)', background: 'rgba(251,191,36,0.06)' }}
+        <div className="flex items-center gap-3">
+          {reviewRequests && reviewRequests.length > 0 && (
+            <button
+              onClick={() => setTab('review')}
+              className="flex items-center gap-2 rounded-xl border px-4 py-2.5 animate-fade-in cursor-pointer"
+              style={{ borderColor: 'rgba(251,191,36,0.25)', background: 'rgba(251,191,36,0.06)' }}
+            >
+              <span className="relative flex size-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
+                <span className="relative inline-flex size-2.5 rounded-full bg-amber-400" />
+              </span>
+              <span className="text-sm font-medium text-amber-400">
+                {reviewRequests.length} demande{reviewRequests.length > 1 ? 's' : ''} à valider
+              </span>
+            </button>
+          )}
+          <button
+            onClick={openForm}
+            className="btn-primary cursor-pointer"
           >
-            <span className="relative flex size-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-amber-400" />
-            </span>
-            <span className="text-sm font-medium text-amber-400">
-              {reviewRequests.length} demande{reviewRequests.length > 1 ? 's' : ''} à valider
-            </span>
-          </div>
-        )}
+            <Send className="size-4" />
+            Nouvelle demande
+          </button>
+        </div>
       </div>
 
       {/* ─── KPI cards ──────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          {
-            icon: ShieldCheck,
-            label: 'À valider',
-            value: reviewRequests ? String(reviewRequests.length) : '…',
-            hint: 'en attente de votre décision',
-            gradient: 'from-amber-400 to-orange-500',
-            shadow: 'shadow-amber-400/20',
-          },
-          {
-            icon: ClipboardList,
-            label: 'Mes demandes',
-            value: myRequests ? String(myRequests.length) : '…',
-            hint: 'demandes soumises',
-            gradient: 'from-blue-500 to-indigo-500',
-            shadow: 'shadow-blue-400/20',
-          },
-          {
-            icon: CheckCircle2,
-            label: 'Décisions',
-            value: myRequests ? String(myRequests.filter((r) => r.status !== 'PENDING').length) : '…',
-            hint: 'validées ou refusées',
-            gradient: 'from-emerald-500 to-teal-500',
-            shadow: 'shadow-emerald-400/20',
-          },
-        ].map((kpi, i) => (
-          <div
-            key={kpi.label}
-            className="card p-4 flex items-center gap-4 animate-fade-in hover:-translate-y-0.5 transition-transform duration-300"
-            style={{ animationDelay: `${i * 0.06}s` }}
-          >
-            <div className={`size-11 shrink-0 rounded-xl bg-gradient-to-br ${kpi.gradient} flex items-center justify-center shadow-lg ${kpi.shadow}`}>
-              <kpi.icon className="size-5 text-white" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{kpi.value}</p>
-              <p className="text-sm font-medium text-zinc-400 mt-1">{kpi.label}</p>
-              <p className="text-xs text-zinc-500 truncate">{kpi.hint}</p>
-            </div>
+        <button
+          type="button"
+          onClick={() => setTab('review')}
+          className="card p-4 flex items-center gap-4 animate-fade-in hover:-translate-y-0.5 transition-transform duration-300 cursor-pointer text-left"
+        >
+          <div className="size-11 shrink-0 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-400/20">
+            <ShieldCheck className="size-5 text-white" />
           </div>
-        ))}
+          <div className="min-w-0">
+            <p className="text-2xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{reviewRequests ? reviewRequests.length : '…'}</p>
+            <p className="text-sm font-medium text-zinc-400 mt-1">À valider</p>
+            <p className="text-xs text-zinc-500 truncate">en attente de votre décision</p>
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('mine')}
+          className="card p-4 flex items-center gap-4 animate-fade-in hover:-translate-y-0.5 transition-transform duration-300 cursor-pointer text-left"
+          style={{ animationDelay: '0.06s' }}
+        >
+          <div className="size-11 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-400/20">
+            <ClipboardList className="size-5 text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-2xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{myRequests ? myRequests.length : '…'}</p>
+            <p className="text-sm font-medium text-zinc-400 mt-1">Mes demandes</p>
+            <p className="text-xs text-zinc-500 truncate">demandes soumises</p>
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('mine')}
+          className="card p-4 flex items-center gap-4 animate-fade-in hover:-translate-y-0.5 transition-transform duration-300 cursor-pointer text-left"
+          style={{ animationDelay: '0.12s' }}
+        >
+          <div className="size-11 shrink-0 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-400/20">
+            <CheckCircle2 className="size-5 text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-2xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{myRequests ? myRequests.filter((r) => r.status !== 'PENDING').length : '…'}</p>
+            <p className="text-sm font-medium text-zinc-400 mt-1">Décisions</p>
+            <p className="text-xs text-zinc-500 truncate">validées ou refusées</p>
+          </div>
+        </button>
       </div>
 
       {/* ─── Tabs ───────────────────────────────────────────── */}
@@ -325,190 +365,6 @@ export default function Requests() {
           );
         })}
       </div>
-
-      {/* ─── Nouvelle demande ───────────────────────────────── */}
-      {tab === 'new' && (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-3 space-y-6">
-            <div className="card overflow-hidden">
-              <div className="px-6 py-4 border-b flex items-center gap-3" style={{ borderColor: 'var(--border-color)' }}>
-                <div className="size-9 rounded-xl bg-gradient-to-br from-gold-400 to-blue-500/80 flex items-center justify-center">
-                  <Send className="size-4 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Nouvelle demande</h3>
-                  <p className="text-xs text-zinc-500">Remplissez le formulaire, votre supérieur validera par email.</p>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-6">
-                <div>
-                  <label className="label mb-2">Type de demande</label>
-                  {typesLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-zinc-500 py-6 justify-center">
-                      <Loader2 className="size-4 animate-spin" /> Chargement des types...
-                    </div>
-                  ) : types && types.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {types.map((t, i) => {
-                        const selected = form.typeId === t.id;
-                        const Icon = TYPE_ICONS[i % TYPE_ICONS.length];
-                        return (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => { setForm({ ...form, typeId: t.id }); setAnswers({}); }}
-                            className={`text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer group ${
-                              selected
-                                ? 'border-transparent ring-2 ring-gold-400/70 bg-gradient-to-br from-gold-400/10 to-blue-500/10'
-                                : 'hover:bg-white/[0.03]'
-                            }`}
-                            style={{ borderColor: selected ? undefined : 'var(--border-color)' }}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className={`size-9 rounded-lg flex items-center justify-center transition-colors ${
-                                selected ? 'bg-gradient-to-br from-gold-400 to-blue-500' : 'bg-white/5 group-hover:bg-white/10'
-                              }`}>
-                                <Icon className={`size-4 ${selected ? 'text-white' : 'text-zinc-400'}`} />
-                              </div>
-                              <span className={`size-4 rounded-full border-2 transition-colors ${
-                                selected ? 'border-gold-400 bg-gold-400' : 'border-zinc-500'
-                              }`}>
-                                {selected && <span className="block size-full rounded-full bg-white/70 scale-[0.35]" />}
-                              </span>
-                            </div>
-                            <p className="text-sm font-semibold mt-3" style={{ color: selected ? 'var(--text-primary)' : undefined }}>{t.name}</p>
-                            {t.description && (
-                              <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">{t.description}</p>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <EmptyState icon={Inbox} title="Aucun type de demande" hint="Contactez un administrateur pour créer un type de demande." />
-                  )}
-                </div>
-
-                {form.typeId && (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
-                      <div className="sm:col-span-2">
-                        <label className="label">Email du supérieur hiérarchique *</label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-500" />
-                          <input
-                            type="email"
-                            className="input !pl-10"
-                            placeholder="superieur@entreprise.com"
-                            value={form.superiorEmail}
-                            onChange={(e) => setForm({ ...form, superiorEmail: e.target.value })}
-                          />
-                        </div>
-                        <p className="text-xs text-zinc-500 mt-1">Un email avec les boutons Valider / Refuser sera envoyé à cette adresse.</p>
-                      </div>
-
-                      {selectedType?.fields?.map((field) => (
-                        <div key={field.key}>
-                          <label className="label">
-                            {field.label} {field.required && <span className="text-red-400">*</span>}
-                          </label>
-                          {field.type === 'textarea' ? (
-                            <textarea
-                              className="input min-h-20 resize-y"
-                              placeholder={field.label}
-                              value={answers[field.key] || ''}
-                              onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
-                            />
-                          ) : field.type === 'select' ? (
-                            <select
-                              className="input cursor-pointer"
-                              value={answers[field.key] || ''}
-                              onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
-                            >
-                              <option value="">— Choisir —</option>
-                              {(field.options || []).map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                              className="input"
-                              placeholder={field.label}
-                              value={answers[field.key] || ''}
-                              onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
-                            />
-                          )}
-                        </div>
-                      ))}
-
-                      <div className="sm:col-span-2">
-                        <label className="label">Détails (optionnel)</label>
-                        <textarea
-                          className="input min-h-24 resize-y"
-                          placeholder="Précisez le contexte de votre demande..."
-                          value={form.details}
-                          onChange={(e) => setForm({ ...form, details: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={submit}
-                      disabled={createMutation.isPending}
-                      className="btn-primary w-full !py-3 text-base cursor-pointer"
-                    >
-                      {createMutation.isPending ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" /> Envoi en cours...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="size-4" /> Envoyer la demande
-                        </>
-                      )}
-                    </button>
-                    <p className="text-xs text-center text-zinc-500 -mt-2">
-                      Une seule demande par envoi. Votre supérieur recevra un lien de validation à usage unique.
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Aside : comment ça marche */}
-          <div className="lg:col-span-2">
-            <div className="card p-6 space-y-5 lg:sticky lg:top-6">
-              <div className="flex items-center gap-2">
-                <Sparkles className="size-4 text-gold-400" />
-                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Comment ça marche ?</h3>
-              </div>
-              <ol className="space-y-4">
-                {[
-                  { icon: FileText, title: 'Choisissez le type', desc: 'Sélectionnez le formulaire correspondant à votre demande.' },
-                  { icon: Mail, title: 'Indiquez votre supérieur', desc: 'Il reçoit un email avec les boutons Valider / Refuser.' },
-                  { icon: CheckCircle2, title: 'Suivez la décision', desc: 'Votre demande passe en « Validée » ou « Refusée » après sa réponse.' },
-                ].map((step, i) => (
-                  <li key={i} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className="size-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
-                        <step.icon className="size-4 text-zinc-400" />
-                      </div>
-                      {i < 2 && <div className="w-px flex-1 bg-white/10 my-1" />}
-                    </div>
-                    <div className="pb-1">
-                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{step.title}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{step.desc}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ─── Mes demandes ───────────────────────────────────── */}
       {tab === 'mine' && (
@@ -547,7 +403,6 @@ export default function Requests() {
                     return (
                       <Fragment key={r.id}>
                         <tr
-                          key={r.id}
                           onClick={() => setExpandedId(expanded ? null : r.id)}
                           className="cursor-pointer transition-colors"
                         >
@@ -572,7 +427,7 @@ export default function Requests() {
                           </td>
                         </tr>
                         {expanded && (
-                          <tr key={`${r.id}-details`} className="animate-fade-in">
+                          <tr className="animate-fade-in">
                             <td colSpan={5} className="px-6 py-5" style={{ background: 'var(--bg-secondary)' }}>
                               {answerRows(r).length > 0 ? (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
@@ -602,7 +457,7 @@ export default function Requests() {
               </table>
             </div>
           ) : (
-            <EmptyState icon={Inbox} title="Aucune demande pour le moment" hint="Soumettez votre première demande dans l'onglet « Nouvelle demande »." />
+            <EmptyState icon={Inbox} title="Aucune demande pour le moment" hint="Soumettez votre première demande via le bouton « Nouvelle demande »." />
           )}
         </div>
       )}
@@ -746,7 +601,6 @@ export default function Requests() {
                     return (
                       <Fragment key={r.id}>
                         <tr
-                          key={r.id}
                           onClick={() => setExpandedId(expanded ? null : r.id)}
                           className="cursor-pointer transition-colors"
                         >
@@ -779,7 +633,7 @@ export default function Requests() {
                           </td>
                         </tr>
                         {expanded && (
-                          <tr key={`${r.id}-details`} className="animate-fade-in">
+                          <tr className="animate-fade-in">
                             <td colSpan={5} className="px-6 py-5" style={{ background: 'var(--bg-secondary)' }}>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
                                 {answerRows(r).map((row) => (
@@ -804,6 +658,183 @@ export default function Requests() {
           ) : (
             <EmptyState icon={Inbox} title="Aucune demande" hint="Aucune demande ne correspond à ce filtre pour le moment." />
           )}
+        </div>
+      )}
+
+      {/* ─── Modal : Nouvelle demande ───────────────────────── */}
+      {formOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-start sm:items-center justify-center p-4 overflow-y-auto"
+          onClick={closeForm}
+        >
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
+          <div
+            className="relative w-full max-w-2xl rounded-2xl border shadow-2xl my-8 animate-modal-in"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* En-tête */}
+            <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="flex items-center gap-3">
+                <div className="size-9 rounded-xl bg-gradient-to-br from-gold-400 to-blue-500/80 flex items-center justify-center">
+                  <Send className="size-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Nouvelle demande</h3>
+                  <p className="text-xs text-zinc-500">Votre supérieur hiérarchique validera par email.</p>
+                </div>
+              </div>
+              <button
+                onClick={closeForm}
+                className="p-2 rounded-lg hover:bg-white/5 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+                aria-label="Fermer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Corps */}
+            <div className="px-6 py-6 space-y-6 max-h-[calc(100vh-12rem)] overflow-y-auto">
+              <div>
+                <label className="label mb-2">Type de demande *</label>
+                {typesLoading ? (
+                  <div className="flex items-center justify-center gap-2 text-sm text-zinc-500 py-8">
+                    <Loader2 className="size-4 animate-spin" /> Chargement des types...
+                  </div>
+                ) : types && types.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {types.map((t, i) => {
+                      const selected = form.typeId === t.id;
+                      const Icon = TYPE_ICONS[i % TYPE_ICONS.length];
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => { setForm({ ...form, typeId: t.id }); setAnswers({}); }}
+                          className={`text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer group ${
+                            selected
+                              ? 'border-transparent ring-2 ring-gold-400/70 bg-gradient-to-br from-gold-400/10 to-blue-500/10'
+                              : 'hover:bg-white/[0.03]'
+                          }`}
+                          style={{ borderColor: selected ? undefined : 'var(--border-color)' }}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className={`size-9 rounded-lg flex items-center justify-center transition-colors ${
+                              selected ? 'bg-gradient-to-br from-gold-400 to-blue-500' : 'bg-white/5 group-hover:bg-white/10'
+                            }`}>
+                              <Icon className={`size-4 ${selected ? 'text-white' : 'text-zinc-400'}`} />
+                            </div>
+                            <span className={`size-4 rounded-full border-2 transition-colors ${
+                              selected ? 'border-gold-400 bg-gold-400' : 'border-zinc-500'
+                            }`}>
+                              {selected && <span className="block size-full rounded-full bg-white/70 scale-[0.35]" />}
+                            </span>
+                          </div>
+                          <p className="text-sm font-semibold mt-3" style={{ color: selected ? 'var(--text-primary)' : undefined }}>{t.name}</p>
+                          {t.description && (
+                            <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">{t.description}</p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState icon={Inbox} title="Aucun type de demande" hint="Contactez un administrateur pour créer un type de demande." />
+                )}
+              </div>
+
+              {form.typeId && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+                  <div className="sm:col-span-2">
+                    <label className="label">Email du supérieur hiérarchique *</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-500" />
+                      <input
+                        type="email"
+                        className="input !pl-10"
+                        placeholder="superieur@entreprise.com"
+                        value={form.superiorEmail}
+                        onChange={(e) => setForm({ ...form, superiorEmail: e.target.value })}
+                      />
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-1">Un email avec les boutons Valider / Refuser sera envoyé à cette adresse.</p>
+                  </div>
+
+                  {selectedType?.fields?.map((field) => (
+                    <div key={field.key}>
+                      <label className="label">
+                        {field.label} {field.required && <span className="text-red-400">*</span>}
+                      </label>
+                      {field.type === 'textarea' ? (
+                        <textarea
+                          className="input min-h-20 resize-y"
+                          placeholder={field.label}
+                          value={answers[field.key] || ''}
+                          onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                        />
+                      ) : field.type === 'select' ? (
+                        <select
+                          className="input cursor-pointer"
+                          value={answers[field.key] || ''}
+                          onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                        >
+                          <option value="">— Choisir —</option>
+                          {(field.options || []).map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+                          className="input"
+                          placeholder={field.label}
+                          value={answers[field.key] || ''}
+                          onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                        />
+                      )}
+                    </div>
+                  ))}
+
+                  <div className="sm:col-span-2">
+                    <label className="label">Détails (optionnel)</label>
+                    <textarea
+                      className="input min-h-24 resize-y"
+                      placeholder="Précisez le contexte de votre demande..."
+                      value={form.details}
+                      onChange={(e) => setForm({ ...form, details: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pied */}
+            {form.typeId && (
+              <div className="px-6 py-4 border-t flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-color)' }}>
+                <p className="text-xs text-zinc-500 hidden sm:block">
+                  Votre supérieur recevra un lien de validation à usage unique.
+                </p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={closeForm} className="btn-secondary cursor-pointer">Annuler</button>
+                  <button
+                    onClick={submit}
+                    disabled={createMutation.isPending}
+                    className="btn-primary cursor-pointer disabled:opacity-60 disabled:pointer-events-none"
+                  >
+                    {createMutation.isPending ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" /> Envoi...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="size-4" /> Envoyer la demande
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

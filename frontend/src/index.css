@@ -351,9 +351,25 @@
   animation: loading-bar 1.2s ease-in-out infinite;
 }
 
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-modal-in {
+  animation: modal-in 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-transition { animation: none; }
   .animate-loading-bar { animation-duration: 2.4s; }
+  .animate-modal-in { animation: none; }
 }
 
 /* Light mode overrides for Tailwind utility classes */
