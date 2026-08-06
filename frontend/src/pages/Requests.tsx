@@ -25,6 +25,7 @@ import {
   Check,
   ArrowRight,
   ArrowLeft,
+  AlertCircle,
 } from 'lucide-react';
 import { requestsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -144,6 +145,16 @@ function EmptyState({ icon: Icon, title, hint }: { icon: React.ElementType; titl
   );
 }
 
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} className="field-error animate-fade-in" role="alert">
+      <AlertCircle className="size-3.5 shrink-0" />
+      {message}
+    </p>
+  );
+}
+
 export default function Requests() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -153,6 +164,7 @@ export default function Requests() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [form, setForm] = useState({ typeId: '', superiorEmail: '', details: '' });
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
   const [reviewBusy, setReviewBusy] = useState<Record<string, string | null>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -197,6 +209,7 @@ export default function Requests() {
   const openForm = () => {
     setForm({ typeId: '', superiorEmail: '', details: '' });
     setAnswers({});
+    setErrors({});
     setStep(1);
     setFormOpen(true);
   };
@@ -220,33 +233,66 @@ export default function Requests() {
   });
 
   const submit = () => {
-    if (!form.typeId) return toast.error('Veuillez choisir un type de demande');
-    if (!form.superiorEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.superiorEmail)) {
-      return toast.error('Adresse email du supérieur invalide');
+    if (!form.typeId) {
+      setErrors({ typeId: 'Veuillez choisir un type de demande' });
+      setStep(1);
+      return;
     }
-    for (const field of selectedType?.fields || []) {
-      const value = (answers[field.key] || '').trim();
-      if (field.required && value === '') {
-        return toast.error(`Le champ « ${field.label} » est requis`);
-      }
+    const errs = validateFields();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      setStep(2);
+      toast.error('Veuillez corriger les champs en rouge');
+      return;
     }
     createMutation.mutate();
   };
 
+  const validateField = (key: string): string => {
+    if (key === 'superiorEmail') {
+      const v = form.superiorEmail.trim();
+      if (!v) return 'Adresse email requise';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Adresse email invalide';
+      return '';
+    }
+    const field = selectedType?.fields?.find((f) => f.key === key);
+    if (field?.required && !(answers[key] || '').trim()) return 'Ce champ est requis';
+    return '';
+  };
+
+  const validateFields = (): Record<string, string> => {
+    const errs: Record<string, string> = {};
+    const emailErr = validateField('superiorEmail');
+    if (emailErr) errs.superiorEmail = emailErr;
+    for (const field of selectedType?.fields || []) {
+      const err = validateField(field.key);
+      if (err) errs[field.key] = err;
+    }
+    return errs;
+  };
+
+  const blurField = (key: string) => {
+    setErrors((prev) => ({ ...prev, [key]: validateField(key) }));
+  };
+
+  const clearError = (key: string) => {
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev));
+  };
+
   const goNext = () => {
     if (step === 1) {
-      if (!form.typeId) return toast.error('Veuillez choisir un type de demande');
+      if (!form.typeId) {
+        setErrors({ typeId: 'Veuillez choisir un type de demande' });
+        return;
+      }
       setStep(2);
       return;
     }
-    if (!form.superiorEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.superiorEmail)) {
-      return toast.error('Adresse email du supérieur invalide');
-    }
-    for (const field of selectedType?.fields || []) {
-      const value = (answers[field.key] || '').trim();
-      if (field.required && value === '') {
-        return toast.error(`Le champ « ${field.label} » est requis`);
-      }
+    const errs = validateFields();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      toast.error('Veuillez corriger les champs en rouge');
+      return;
     }
     setStep(3);
   };
@@ -771,7 +817,7 @@ export default function Requests() {
                             <button
                               key={t.id}
                               type="button"
-                              onClick={() => { setForm({ ...form, typeId: t.id }); setAnswers({}); }}
+                              onClick={() => { setForm({ ...form, typeId: t.id }); setAnswers({}); clearError('typeId'); }}
                               className={`text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer group ${
                                 selected
                                   ? 'border-transparent ring-2 ring-gold-400/70 bg-gradient-to-br from-gold-400/10 to-blue-500/10'
@@ -795,15 +841,16 @@ export default function Requests() {
                               {t.description && (
                                 <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">{t.description}</p>
                               )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <EmptyState icon={Inbox} title="Aucun type de demande" hint="Contactez un administrateur pour créer un type de demande." />
-                    )}
-                  </div>
-                )}
+</button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <EmptyState icon={Inbox} title="Aucun type de demande" hint="Contactez un administrateur pour créer un type de demande." />
+                  )}
+                  <FieldError id="err-typeId" message={errors.typeId} />
+                </div>
+              )}
 
                 {/* Étape 2 — Détails */}
                 {step === 2 && selectedType && (
@@ -837,12 +884,16 @@ export default function Requests() {
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-500" />
                           <input
                             type="email"
-                            className="input !pl-10"
+                            className={`input !pl-10 ${errors.superiorEmail ? 'input-error' : ''}`}
                             placeholder="superieur@entreprise.com"
                             value={form.superiorEmail}
-                            onChange={(e) => setForm({ ...form, superiorEmail: e.target.value })}
+                            aria-invalid={!!errors.superiorEmail}
+                            aria-describedby={errors.superiorEmail ? 'err-superiorEmail' : undefined}
+                            onChange={(e) => { setForm({ ...form, superiorEmail: e.target.value }); clearError('superiorEmail'); }}
+                            onBlur={() => blurField('superiorEmail')}
                           />
                         </div>
+                        <FieldError id="err-superiorEmail" message={errors.superiorEmail} />
                         <p className="text-xs text-zinc-500 mt-1">Un email avec les boutons Valider / Refuser sera envoyé à cette adresse.</p>
                       </div>
 
@@ -853,16 +904,22 @@ export default function Requests() {
                           </label>
                           {field.type === 'textarea' ? (
                             <textarea
-                              className="input min-h-20 resize-y"
+                              className={`input min-h-20 resize-y ${errors[field.key] ? 'input-error' : ''}`}
                               placeholder={field.label}
                               value={answers[field.key] || ''}
-                              onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                              aria-invalid={!!errors[field.key]}
+                              aria-describedby={errors[field.key] ? `err-${field.key}` : undefined}
+                              onChange={(e) => { setAnswers({ ...answers, [field.key]: e.target.value }); clearError(field.key); }}
+                              onBlur={() => blurField(field.key)}
                             />
                           ) : field.type === 'select' ? (
                             <select
-                              className="input cursor-pointer"
+                              className={`input cursor-pointer ${errors[field.key] ? 'input-error' : ''}`}
                               value={answers[field.key] || ''}
-                              onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                              aria-invalid={!!errors[field.key]}
+                              aria-describedby={errors[field.key] ? `err-${field.key}` : undefined}
+                              onChange={(e) => { setAnswers({ ...answers, [field.key]: e.target.value }); clearError(field.key); }}
+                              onBlur={() => blurField(field.key)}
                             >
                               <option value="">— Choisir —</option>
                               {(field.options || []).map((opt) => (
@@ -872,12 +929,16 @@ export default function Requests() {
                           ) : (
                             <input
                               type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                              className="input"
+                              className={`input ${errors[field.key] ? 'input-error' : ''}`}
                               placeholder={field.label}
                               value={answers[field.key] || ''}
-                              onChange={(e) => setAnswers({ ...answers, [field.key]: e.target.value })}
+                              aria-invalid={!!errors[field.key]}
+                              aria-describedby={errors[field.key] ? `err-${field.key}` : undefined}
+                              onChange={(e) => { setAnswers({ ...answers, [field.key]: e.target.value }); clearError(field.key); }}
+                              onBlur={() => blurField(field.key)}
                             />
                           )}
+                          <FieldError id={`err-${field.key}`} message={errors[field.key]} />
                         </div>
                       ))}
 
