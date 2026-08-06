@@ -410,7 +410,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
 
-    // Email au supérieur (échec d'envoi non bloquant)
+    // Envoi de l'email au supérieur : s'il échoue, la demande n'est pas créée
+    // (on ne peut pas confirmer l'envoi avec une adresse invalide / un problème de config).
     try {
       await sendRequestToSuperior({
         ...request,
@@ -419,7 +420,10 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       });
     } catch (err) {
       console.error('Superior email error:', (err as Error).message);
-      res.status(201).json({ ...request, emailError: 'La demande a été créée mais l\'email au supérieur n\'a pas pu être envoyé. Vérifiez la configuration du compte email.' });
+      await prisma.request.delete({ where: { id: request.id } }).catch(() => {});
+      res.status(500).json({
+        error: "L'email de validation n'a pas pu être envoyé au supérieur. Vérifiez l'adresse email et la configuration du compte d'envoi, puis réessayez.",
+      });
       return;
     }
 
