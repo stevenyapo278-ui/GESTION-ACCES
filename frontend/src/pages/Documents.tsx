@@ -79,7 +79,7 @@ export default function Documents() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>Documents téléchargeables</h1>
-          <p className="text-sm text-zinc-400 mt-1">
+          <p className={`text-sm mt-1 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
             Gérez les formulaires PDF disponibles en téléchargement public
           </p>
         </div>
@@ -171,15 +171,13 @@ export default function Documents() {
                   <div className="flex items-center gap-2">
                     <h3 className={`font-medium ${isDark ? 'text-white' : 'text-zinc-900'} truncate`}>{doc.title}</h3>
                     {!doc.isActive && (
-                      <span className="badge bg-zinc-700 text-zinc-400 text-[10px]">
-                        Inactif
-                      </span>
+                      <span className="badge badge-muted">Inactif</span>
                     )}
                   </div>
                   {doc.description && (
                     <p className="text-sm text-zinc-500 truncate">{doc.description}</p>
                   )}
-                  <p className="text-xs text-zinc-600 mt-0.5">
+                  <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
                     {doc.fileName} &middot; {formatSize(doc.fileSize)}
                   </p>
                 </div>

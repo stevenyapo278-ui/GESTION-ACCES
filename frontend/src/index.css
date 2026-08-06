@@ -288,6 +288,10 @@
     background: rgba(239, 68, 68, 0.1);
     color: #ef4444;
   }
+  .badge-muted {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+  }
 
   /* ─── Tables ────────────────────────────────────────────── */
   .table-wrap {

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { requestsAPI } from '../services/api';
-import { useTheme } from '../contexts/ThemeContext';
 import type { RequestField } from '../types';
 import { Loader2, CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
 
@@ -22,7 +21,6 @@ interface ReviewData {
 
 export default function ReviewRequest() {
   const { token } = useParams<{ token: string }>();
-  const { isDark } = useTheme();
   const [searchParams] = useSearchParams();
   const [data, setData] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,7 +64,7 @@ export default function ReviewRequest() {
             <ShieldCheck className="size-5 text-white" />
           </div>
           <div>
-            <h1 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-zinc-900'}`}>Validation de demande</h1>
+            <h1 className="text-lg font-semibold text-white">Validation de demande</h1>
             <p className="text-xs text-zinc-500">Gestions Access</p>
           </div>
         </div>
@@ -175,7 +173,7 @@ export default function ReviewRequest() {
           ) : null}
         </div>
 
-        <p className="text-center text-xs text-zinc-600 mt-6">
+        <p className="text-center text-xs text-zinc-500 mt-6">
           <Link to="/login" className="hover:text-zinc-400">Accéder à l'application</Link>
         </p>
       </div>

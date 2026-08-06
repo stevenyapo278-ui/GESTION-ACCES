@@ -312,7 +312,7 @@ export default function EmailAccounts() {
                     <td className="px-5 py-4">
                       <button
                         onClick={() => updateMutation.mutate({ id: a.id, data: { isActive: !a.isActive } })}
-                        className={a.isActive ? 'text-emerald-500 hover:text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'}
+                        className={a.isActive ? 'text-emerald-500 hover:text-emerald-400' : 'text-[color:var(--text-muted)] hover:text-zinc-300'}
                       >
                         {a.isActive ? <ToggleRight className="size-5" /> : <ToggleLeft className="size-5" />}
                       </button>

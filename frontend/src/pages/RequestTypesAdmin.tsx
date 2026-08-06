@@ -256,13 +256,13 @@ export default function RequestTypesAdmin() {
                     <td className="px-5 py-4 text-sm text-zinc-500">
                       {t.fields && t.fields.length > 0
                         ? t.fields.map((f) => f.label).join(', ')
-                        : <span className="text-zinc-600">par défaut</span>}
+                        : <span className="text-[color:var(--text-muted)]">par défaut</span>}
                     </td>
                     <td className="px-5 py-4 text-sm text-zinc-500">{t._count?.requests ?? 0}</td>
                     <td className="px-5 py-4">
                       <button
                         onClick={() => updateMutation.mutate({ id: t.id, data: { isActive: !t.isActive } })}
-                        className={t.isActive ? 'text-emerald-500 hover:text-emerald-400' : 'text-zinc-600 hover:text-zinc-400'}
+                        className={t.isActive ? 'text-emerald-500 hover:text-emerald-400' : 'text-[color:var(--text-muted)] hover:text-zinc-300'}
                         title={t.isActive ? 'Désactiver' : 'Activer'}
                       >
                         {t.isActive ? <ToggleRight className="size-5" /> : <ToggleLeft className="size-5" />}
