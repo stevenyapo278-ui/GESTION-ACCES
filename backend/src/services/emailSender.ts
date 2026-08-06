@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import prisma from '../lib/prisma';
 import { graphFetch } from './graphClient';
-import { resolveFrontendUrl, getNotificationEmail } from './systemSettings';
+import { resolveFrontendUrl, getNotificationEmails } from './systemSettings';
 
 export interface SendEmailOptions {
   to: string | string[];
@@ -321,8 +321,8 @@ export async function sendRequestDecisionToRequester(request: any): Promise<void
 
 // Email de notification à l'équipe après la décision du supérieur
 export async function sendRequestDecisionToAdmin(request: any): Promise<void> {
-  const notificationEmail = await getNotificationEmail();
-  if (!notificationEmail) return;
+  const recipients = await getNotificationEmails();
+  if (recipients.length === 0) return;
 
   const approved = request.status === 'APPROVED';
   const requesterName = request.requesterName
@@ -342,5 +342,5 @@ export async function sendRequestDecisionToAdmin(request: any): Promise<void> {
     rows: decisionRows(request),
     footerLink: { href: `${frontendUrl}/requests`, label: 'Voir les demandes dans l\'application' },
   });
-  await sendEmail({ to: notificationEmail, subject, bodyHtml });
+  await sendEmail({ to: recipients, subject, bodyHtml });
 }

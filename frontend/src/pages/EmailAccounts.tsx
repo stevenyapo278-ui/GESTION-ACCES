@@ -422,11 +422,18 @@ export default function EmailAccounts() {
 
       <div className="card p-5">
         <h3 className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Réglages email</h3>
-        <p className="text-xs text-zinc-500 mb-4">Adresse qui reçoit les décisions, et URL publique de l'application (liens de validation).</p>
+        <p className="text-xs text-zinc-500 mb-4">Adresses qui reçoivent les décisions, et URL publique de l'application (liens de validation).</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="label">Email de notification (équipe)</label>
-            <input className="input" value={settings.notificationEmail} onChange={(e) => setSettings({ ...settings, notificationEmail: e.target.value })} placeholder={settingsData?.notificationEmail || 'admin@example.com'} />
+            <label className="label">Adresses qui reçoivent les décisions</label>
+            <textarea
+              className="input min-h-20 resize-y"
+              rows={3}
+              value={settings.notificationEmail}
+              onChange={(e) => setSettings({ ...settings, notificationEmail: e.target.value })}
+              placeholder={settingsData?.notificationEmail || 'admin@example.com'}
+            />
+            <p className="text-xs text-zinc-500 mt-1">Plusieurs adresses possibles, séparées par des virgules ou des retours à la ligne.</p>
           </div>
           <div>
             <label className="label">URL publique du frontend</label>

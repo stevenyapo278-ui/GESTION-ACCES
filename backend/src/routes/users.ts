@@ -1,6 +1,6 @@
 import prisma from '../lib/prisma';
 import { Router, Response } from 'express';
-import { PrismaClient, Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
@@ -40,6 +40,10 @@ router.post('/', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, r
       res.status(400).json({ error: 'All fields are required' });
       return;
     }
+    if (role && !Object.values(Role).includes(role)) {
+      res.status(400).json({ error: 'Rôle invalide' });
+      return;
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -71,9 +75,42 @@ router.put('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthRequest,
   try {
     const { firstName, lastName, role, isActive } = req.body;
 
+    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!target) {
+      res.status(404).json({ error: 'Utilisateur introuvable' });
+      return;
+    }
+
+    const data: Prisma.UserUpdateInput = {};
+    if (firstName !== undefined) data.firstName = firstName;
+    if (lastName !== undefined) data.lastName = lastName;
+    if (isActive !== undefined) data.isActive = isActive;
+
+    if (role !== undefined) {
+      if (role !== '' && !Object.values(Role).includes(role)) {
+        res.status(400).json({ error: 'Rôle invalide' });
+        return;
+      }
+      // Garde-fou : impossible de modifier son propre rôle (évite de se verrouiller)
+      if (req.params.id === req.user!.id) {
+        res.status(400).json({ error: 'Vous ne pouvez pas modifier votre propre rôle' });
+        return;
+      }
+      const nextRole: Role = role || Role.EDITOR;
+      // Garde-fou : impossible de rétrograder le dernier administrateur
+      if (target.role === Role.ADMIN && nextRole !== Role.ADMIN) {
+        const admins = await prisma.user.count({ where: { role: Role.ADMIN } });
+        if (admins <= 1) {
+          res.status(400).json({ error: 'Impossible de rétrograder le dernier administrateur' });
+          return;
+        }
+      }
+      data.role = nextRole;
+    }
+
     const user = await prisma.user.update({
       where: { id: req.params.id },
-      data: { firstName, lastName, role, isActive },
+      data,
       select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true },
     });
 

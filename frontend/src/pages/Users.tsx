@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Plus, Loader2, ShieldAlert, ShieldCheck, Shield, ToggleRight, ToggleLeft, Trash2 } from 'lucide-react';
+import { Plus, Loader2, ShieldAlert, ShieldCheck, Shield, ToggleRight, ToggleLeft, Trash2, Pencil } from 'lucide-react';
 import { usersAPI } from '../services/api';
 import type { User, Role } from '../types';
 import toast from 'react-hot-toast';
@@ -17,6 +17,7 @@ export default function Users() {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'EDITOR' as Role });
 
   const { data: users, isLoading } = useQuery<User[]>({
@@ -34,6 +35,19 @@ export default function Users() {
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => usersAPI.update(id, { isActive: !isActive }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
     onError: (err: any) => toast.error(err.response?.data?.error || 'Erreur'),
+  });
+
+  const roleMutation = useMutation({
+    mutationFn: ({ id, role }: { id: string; role: Role }) => usersAPI.update(id, { role }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setEditingRoleId(null);
+      toast.success('Rôle mis à jour');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Erreur lors du changement de rôle');
+      setEditingRoleId(null);
+    },
   });
 
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -144,10 +158,36 @@ export default function Users() {
                     </td>
                     <td className="px-5 py-4 text-sm" style={{ color: 'var(--text-secondary)' }}>{user.email}</td>
                     <td className="px-5 py-4">
-                      <span className={`badge ${role.color}`}>
-                        <RoleIcon className="size-3 mr-1" />
-                        {role.label}
-                      </span>
+                      {editingRoleId === user.id ? (
+                        <select
+                          className="input !py-1.5 text-xs cursor-pointer"
+                          autoFocus
+                          value={user.role}
+                          disabled={roleMutation.isPending}
+                          onChange={(e) => roleMutation.mutate({ id: user.id, role: e.target.value as Role })}
+                          onBlur={() => setEditingRoleId(null)}
+                        >
+                          <option value="ADMIN">Administrateur</option>
+                          <option value="EDITOR">Éditeur</option>
+                          <option value="READER">Lecteur</option>
+                        </select>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className={`badge ${role.color}`}>
+                            <RoleIcon className="size-3 mr-1" />
+                            {role.label}
+                          </span>
+                          {user.id !== currentUser?.id && (
+                            <button
+                              onClick={() => setEditingRoleId(user.id)}
+                              className="p-1 rounded text-zinc-500 hover:text-accent-blue hover:bg-white/5 transition-colors"
+                              title="Changer le rôle"
+                            >
+                              <Pencil className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-4">
                       <span className={`badge ${user.isActive !== false ? 'badge-success' : 'badge-danger'}`}>

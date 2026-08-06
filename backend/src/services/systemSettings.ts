@@ -26,3 +26,19 @@ export async function getNotificationEmail(): Promise<string> {
   if (stored) return stored;
   return process.env.NOTIFICATION_EMAIL || '';
 }
+
+// Liste des adresses qui reçoivent les notifications de décision.
+// Les adresses peuvent être séparées par des virgules, points-virgules ou retours à la ligne.
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function parseEmailList(raw: string): string[] {
+  return (raw || '')
+    .split(/[\n,;]+/)
+    .map((addr) => addr.trim())
+    .filter((addr) => EMAIL_REGEX.test(addr));
+}
+
+export async function getNotificationEmails(): Promise<string[]> {
+  const raw = await getNotificationEmail();
+  return parseEmailList(raw);
+}

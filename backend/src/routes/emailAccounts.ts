@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { EmailProvider } from '@prisma/client';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { Role } from '@prisma/client';
-import { resolveFrontendUrl, getNotificationEmail, setSetting } from '../services/systemSettings';
+import { resolveFrontendUrl, getNotificationEmail, parseEmailList, setSetting } from '../services/systemSettings';
 
 const router = Router();
 
@@ -90,7 +90,16 @@ router.put('/settings', authenticate, authorize(Role.ADMIN), async (req: AuthReq
   try {
     const { notificationEmail, frontendUrl } = req.body;
     if (notificationEmail !== undefined) {
-      await setSetting('NOTIFICATION_EMAIL', notificationEmail);
+      const emails = parseEmailList(String(notificationEmail));
+      const raw = String(notificationEmail)
+        .split(/[\n,;]+/)
+        .map((addr) => addr.trim())
+        .filter(Boolean);
+      if (raw.some((addr) => !emails.includes(addr))) {
+        res.status(400).json({ error: 'Une des adresses email de notification est invalide' });
+        return;
+      }
+      await setSetting('NOTIFICATION_EMAIL', raw.join(', '));
     }
     if (frontendUrl !== undefined) {
       await setSetting('FRONTEND_URL', frontendUrl);
