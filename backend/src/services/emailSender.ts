@@ -76,46 +76,197 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
 
 // === Templates des demandes ===
 
-const EMAIL_STYLE = `
-  <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; background: #f8fafc; margin: 0; padding: 24px; }
-    .card { background: #ffffff; border-radius: 12px; padding: 28px; max-width: 560px; margin: 0 auto; border: 1px solid #e2e8f0; }
-    h2 { margin: 0 0 16px; color: #0f172a; }
-    table { border-collapse: collapse; margin: 16px 0; width: 100%; }
-    td { padding: 6px 12px 6px 0; color: #64748b; vertical-align: top; }
-    td:last-child { color: #0f172a; font-weight: 600; }
-    .btn { display: inline-block; padding: 12px 24px; border-radius: 8px; color: #fff; text-decoration: none; font-weight: 600; margin: 4px 8px 4px 0; }
-    .btn-approve { background: #16a34a; }
-    .btn-reject { background: #dc2626; }
-    .footer { color: #94a3b8; font-size: 12px; margin-top: 24px; }
-  </style>`;
+const APP_NAME = 'Gestions Access';
 
-function answersRows(request: any): string {
-  const data = request.data && typeof request.data === 'object' ? request.data : {};
-  const fields = Array.isArray(request.type?.fields) ? request.type.fields : [];
-  const rows = fields
-    .filter((f: any) => f?.key && data[f.key] !== undefined && data[f.key] !== '')
-    .map((f: any) => `<tr><td>${f.label || f.key}</td><td>${data[f.key]}</td></tr>`)
-    .join('');
-  const extra = Object.entries(data)
-    .filter(([k]) => !fields.some((f: any) => f.key === k))
-    .map(([k, v]) => `<tr><td>${k}</td><td>${String(v)}</td></tr>`)
-    .join('');
-  return rows + extra;
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-function detailTable(request: any): string {
+interface EmailAction {
+  href: string;
+  label: string;
+  bg: string;
+}
+
+interface EmailRow {
+  label: string;
+  value: string;
+}
+
+interface EmailLayoutOptions {
+  title: string;
+  badge?: { text: string; bg: string; color: string } | null;
+  paragraphs: string[];
+  rows: EmailRow[];
+  actions?: EmailAction[];
+  footerNote?: string;
+  footerLink?: { href: string; label: string };
+  preheader: string;
+}
+
+function actionButtons(actions: EmailAction[]): string {
+  return actions
+    .map(
+      (a) => `
+      <table role="presentation" cellpadding="0" cellspacing="0" style="display:inline-block;margin:2px 8px 2px 0;">
+        <tr>
+          <td style="border-radius:10px;background:${a.bg};">
+            <a href="${a.href}" style="display:inline-block;padding:12px 24px;border-radius:10px;font-family:'Segoe UI',Arial,sans-serif;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;line-height:1.4;">${a.label}</a>
+          </td>
+        </tr>
+      </table>`
+    )
+    .join('');
+}
+
+function rowsHtml(rows: EmailRow[]): string {
+  if (!rows.length) return '<tr><td style="padding:10px 0;color:#64748b;font-size:13px;font-family:\'Segoe UI\',Arial,sans-serif;">—</td></tr>';
+  return rows
+    .map(
+      (r) => `
+      <tr>
+        <td class="row-label" width="35%" style="padding:9px 12px 9px 0;border-bottom:1px solid #eef2f7;color:#64748b;font-size:13px;font-family:'Segoe UI',Arial,sans-serif;vertical-align:top;">${r.label}</td>
+        <td class="row-value" style="padding:9px 0;border-bottom:1px solid #eef2f7;color:#0f172a;font-size:13px;font-weight:600;font-family:'Segoe UI',Arial,sans-serif;vertical-align:top;word-break:break-word;">${r.value}</td>
+      </tr>`
+    )
+    .join('');
+}
+
+function emailLayout(opts: EmailLayoutOptions): string {
+  const { title, badge, paragraphs, rows, actions, footerNote, footerLink, preheader } = opts;
+  const badgeHtml = badge
+    ? `<span class="badge" style="display:inline-block;margin:0 0 14px;background:${badge.bg};color:${badge.color};padding:5px 14px;border-radius:999px;font-size:12px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif;">${badge.text}</span>`
+    : '';
+  const paragraphsHtml = paragraphs
+    .map(
+      (p) =>
+        `<p class="paragraph" style="margin:0 0 10px;color:#475569;font-size:14px;line-height:1.6;font-family:'Segoe UI',Arial,sans-serif;">${p}</p>`
+    )
+    .join('\n');
+  const actionsHtml = actions?.length
+    ? `<div style="margin:24px 0 6px;">${actionButtons(actions)}</div>`
+    : '';
+  const footerLinkHtml = footerLink
+    ? `<p style="margin:14px 0 0;"><a href="${footerLink.href}" style="color:#2563eb;text-decoration:underline;font-family:'Segoe UI',Arial,sans-serif;font-size:13px;">${footerLink.label}</a></p>`
+    : '';
+  const footerNoteHtml = footerNote
+    ? `<p class="footer-note" style="margin:14px 0 0;color:#94a3b8;font-size:12px;line-height:1.5;font-family:'Segoe UI',Arial,sans-serif;">${footerNote}</p>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>${title}</title>
+<style>
+  @media (prefers-color-scheme: dark) {
+    .body { background-color: #0b1220 !important; }
+    .card { background-color: #111827 !important; }
+    .title { color: #f9fafb !important; }
+    .paragraph { color: #9ca3af !important; }
+    .row-label { color: #9ca3af !important; }
+    .row-value { color: #f3f4f6 !important; }
+    .footer-note { color: #6b7280 !important; }
+  }
+</style>
+</head>
+<body class="body" style="margin:0;padding:0;background-color:#f1f5f9;-webkit-text-size-adjust:100%;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${preheader}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:24px 12px;">
+  <tr>
+    <td align="center">
+      <table class="card" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+        <tr>
+          <td style="background:#0f172a;background-image:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:22px 32px;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="vertical-align:middle;">
+                  <div style="width:42px;height:42px;background:#d29922;border-radius:11px;text-align:center;font-family:'Segoe UI',Arial,sans-serif;font-size:18px;font-weight:800;color:#ffffff;line-height:42px;">GA</div>
+                </td>
+                <td style="padding-left:14px;vertical-align:middle;">
+                  <div style="color:#ffffff;font-size:17px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif;">${APP_NAME}</div>
+                  <div style="color:#94a3b8;font-size:12px;font-family:'Segoe UI',Arial,sans-serif;">Gestion des accès et des demandes</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 32px 6px;">
+            ${badgeHtml}
+            <h1 class="title" style="margin:0 0 14px;color:#0f172a;font-size:20px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif;">${title}</h1>
+            ${paragraphsHtml}
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 0;border-collapse:collapse;">
+              ${rowsHtml(rows)}
+            </table>
+            ${actionsHtml}
+          </td>
+        </tr>
+        <tr>
+          <td class="footer" style="padding:18px 32px 26px;border-top:1px solid #eef2f7;color:#94a3b8;font-size:12px;line-height:1.6;font-family:'Segoe UI',Arial,sans-serif;">
+            ${footerNoteHtml}
+            ${footerLinkHtml}
+            <p style="margin:14px 0 0;">Ceci est un message automatique envoyé par <strong style="color:#64748b;">${APP_NAME}</strong>. Merci de ne pas y répondre.</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`.trim();
+}
+
+function requestRows(request: any): EmailRow[] {
+  const data = request.data && typeof request.data === 'object' ? request.data : {};
+  const fields = Array.isArray(request.type?.fields) ? request.type.fields : [];
+  const rows: EmailRow[] = [];
+
   const requesterName = request.requesterName
     || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'Utilisateur');
   const requesterEmail = request.requesterEmail || request.requester?.email || '';
-  return `
-  <table>
-    <tr><td>Demandeur</td><td>${requesterName} ${requesterEmail ? `(${requesterEmail})` : ''}</td></tr>
-    <tr><td>Type de demande</td><td>${request.type?.name || 'Demande'}</td></tr>
-    ${answersRows(request)}
-    ${request.details ? `<tr><td>Détails</td><td>${request.details}</td></tr>` : ''}
-    <tr><td>Date</td><td>${new Date(request.createdAt).toLocaleString('fr-FR')}</td></tr>
-  </table>`;
+  rows.push({
+    label: 'Demandeur',
+    value: `${escapeHtml(requesterName)}${
+      requesterEmail ? ` <span style="font-weight:400;color:#64748b;">(${escapeHtml(requesterEmail)})</span>` : ''
+    }`,
+  });
+  rows.push({ label: 'Type de demande', value: escapeHtml(request.type?.name || 'Demande') });
+
+  for (const f of fields) {
+    const v = data[f.key];
+    if (f?.key && v !== undefined && v !== '') {
+      rows.push({ label: escapeHtml(f.label || f.key), value: escapeHtml(v) });
+    }
+  }
+  for (const [k, v] of Object.entries(data)) {
+    if (!fields.some((f: any) => f.key === k)) {
+      rows.push({ label: escapeHtml(k), value: escapeHtml(v) });
+    }
+  }
+
+  if (request.details) rows.push({ label: 'Détails', value: escapeHtml(request.details) });
+  rows.push({ label: 'Date de soumission', value: escapeHtml(new Date(request.createdAt).toLocaleString('fr-FR')) });
+  return rows;
+}
+
+function decisionRows(request: any): EmailRow[] {
+  const rows = requestRows(request);
+  rows.push({ label: 'Supérieur', value: escapeHtml(request.superiorEmail) });
+  if (request.decisionComment) rows.push({ label: 'Commentaire', value: escapeHtml(request.decisionComment) });
+  rows.push({
+    label: 'Décision le',
+    value: escapeHtml(request.decidedAt ? new Date(request.decidedAt).toLocaleString('fr-FR') : '-'),
+  });
+  return rows;
 }
 
 // Email envoyé au supérieur hiérarchique avec les boutons Valider / Refuser
@@ -124,21 +275,23 @@ export async function sendRequestToSuperior(request: any): Promise<void> {
   const reviewUrl = `${frontendUrl}/requests/review/${request.decisionToken}`;
   const requesterName = request.requesterName
     || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'l\'utilisateur');
-  const subject = `[Validation] Demande de ${requesterName} — ${request.type?.name || 'Demande'}`;
-  const bodyHtml = `
-  ${EMAIL_STYLE}
-  <div class="card">
-    <h2>Demande de validation</h2>
-    <p>Bonjour,</p>
-    <p>L'utilisateur ci-dessous a soumis une demande qui requiert votre validation :</p>
-    ${detailTable(request)}
-    <p>Cliquez sur un des boutons pour répondre :</p>
-    <p>
-      <a class="btn btn-approve" href="${reviewUrl}?action=approve">✓ Valider</a>
-      <a class="btn btn-reject" href="${reviewUrl}?action=reject">✗ Refuser</a>
-    </p>
-    <p class="footer">Ce lien est à usage unique. La première réponse enregistrée fera foi.</p>
-  </div>`.trim();
+  const typeName = request.type?.name || 'Demande';
+  const subject = `[Validation] Demande de ${requesterName} — ${typeName}`;
+
+  const bodyHtml = emailLayout({
+    title: 'Demande de validation',
+    preheader: `${requesterName} a soumis une demande qui requiert votre validation.`,
+    paragraphs: [
+      'Bonjour,',
+      `${escapeHtml(requesterName)} a soumis une demande qui requiert votre validation. Voici le récapitulatif :`,
+    ],
+    rows: requestRows(request),
+    actions: [
+      { href: `${reviewUrl}?action=approve`, label: '✓ Valider', bg: '#16a34a' },
+      { href: `${reviewUrl}?action=reject`, label: '✗ Refuser', bg: '#dc2626' },
+    ],
+    footerNote: 'Ce lien est à usage unique. La première réponse enregistrée fera foi.',
+  });
   await sendEmail({ to: request.superiorEmail, subject, bodyHtml });
 }
 
@@ -149,25 +302,20 @@ export async function sendRequestDecisionToRequester(request: any): Promise<void
 
   const approved = request.status === 'APPROVED';
   const typeName = request.type?.name || 'Demande';
-  const subject = approved
-    ? `✅ Votre demande a été validée — ${typeName}`
-    : `❌ Votre demande a été refusée — ${typeName}`;
-  const decisionBadge = approved
-    ? '<span style="background:#dcfce7;color:#166534;padding:4px 12px;border-radius:999px;font-weight:600">Validée</span>'
-    : '<span style="background:#fee2e2;color:#991b1b;padding:4px 12px;border-radius:999px;font-weight:600">Refusée</span>';
-  const bodyHtml = `
-  ${EMAIL_STYLE}
-  <div class="card">
-    <h2>Décision sur votre demande ${decisionBadge}</h2>
-    <p>Bonjour,</p>
-    <p>Voici la décision de votre supérieur concernant votre demande :</p>
-    ${detailTable(request)}
-    <table>
-      <tr><td>Supérieur</td><td>${request.superiorEmail}</td></tr>
-      ${request.decisionComment ? `<tr><td>Commentaire</td><td>${request.decisionComment}</td></tr>` : ''}
-      <tr><td>Décision le</td><td>${request.decidedAt ? new Date(request.decidedAt).toLocaleString('fr-FR') : '-'}</td></tr>
-    </table>
-  </div>`.trim();
+  const subject = `${approved ? '✅' : '❌'} Votre demande ${approved ? 'a été validée' : 'a été refusée'} — ${typeName}`;
+  const badge = approved
+    ? { text: 'Validée', bg: '#dcfce7', color: '#166534' }
+    : { text: 'Refusée', bg: '#fee2e2', color: '#991b1b' };
+  const frontendUrl = await resolveFrontendUrl();
+
+  const bodyHtml = emailLayout({
+    title: 'Décision sur votre demande',
+    badge,
+    preheader: `Votre demande a été ${approved ? 'validée' : 'refusée'} par votre supérieur.`,
+    paragraphs: ['Bonjour,', 'Votre supérieur hiérarchique a pris une décision concernant votre demande :'],
+    rows: decisionRows(request),
+    footerLink: { href: `${frontendUrl}/requests`, label: 'Voir mes demandes dans l\'application' },
+  });
   await sendEmail({ to: requesterEmail, subject, bodyHtml });
 }
 
@@ -179,21 +327,20 @@ export async function sendRequestDecisionToAdmin(request: any): Promise<void> {
   const approved = request.status === 'APPROVED';
   const requesterName = request.requesterName
     || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'l\'utilisateur');
-  const subject = `${approved ? '✅ Validée' : '❌ Refusée'} — Demande de ${requesterName} (${request.type?.name || 'Demande'})`;
-  const decisionBadge = approved
-    ? '<span style="background:#dcfce7;color:#166534;padding:4px 12px;border-radius:999px;font-weight:600">Validée</span>'
-    : '<span style="background:#fee2e2;color:#991b1b;padding:4px 12px;border-radius:999px;font-weight:600">Refusée</span>';
-  const bodyHtml = `
-  ${EMAIL_STYLE}
-  <div class="card">
-    <h2>Décision reçue ${decisionBadge}</h2>
-    <p>Le supérieur hiérarchique a répondu à la demande suivante :</p>
-    ${detailTable(request)}
-    <table>
-      <tr><td>Supérieur</td><td>${request.superiorEmail}</td></tr>
-      ${request.decisionComment ? `<tr><td>Commentaire</td><td>${request.decisionComment}</td></tr>` : ''}
-      <tr><td>Décision le</td><td>${request.decidedAt ? new Date(request.decidedAt).toLocaleString('fr-FR') : '-'}</td></tr>
-    </table>
-  </div>`.trim();
+  const typeName = request.type?.name || 'Demande';
+  const subject = `${approved ? '✅ Validée' : '❌ Refusée'} — Demande de ${requesterName} (${typeName})`;
+  const badge = approved
+    ? { text: 'Validée', bg: '#dcfce7', color: '#166534' }
+    : { text: 'Refusée', bg: '#fee2e2', color: '#991b1b' };
+  const frontendUrl = await resolveFrontendUrl();
+
+  const bodyHtml = emailLayout({
+    title: 'Décision reçue',
+    badge,
+    preheader: `Le supérieur a ${approved ? 'validé' : 'refusé'} la demande de ${requesterName}.`,
+    paragraphs: ['Le supérieur hiérarchique a répondu à la demande suivante :'],
+    rows: decisionRows(request),
+    footerLink: { href: `${frontendUrl}/requests`, label: 'Voir les demandes dans l\'application' },
+  });
   await sendEmail({ to: notificationEmail, subject, bodyHtml });
 }
