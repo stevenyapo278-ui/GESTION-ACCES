@@ -46,7 +46,7 @@ app.use('/api/forms', formRoutes);
 app.use('/api/backups', backupRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/email-accounts', emailAccountRoutes);
-app.use('/api/oauth', outlookOAuthRoutes);
+app.use('/api/oauth/outlook', outlookOAuthRoutes);
 app.use('/api/requests', requestRoutes);
 
 // Health check
