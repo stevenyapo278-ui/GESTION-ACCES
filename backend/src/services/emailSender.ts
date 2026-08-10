@@ -11,7 +11,7 @@ export interface SendEmailOptions {
 
 // Sélection du compte d'envoi : priorité au compte Outlook (Graph API) par défaut,
 // sinon Outlook actif, sinon SMTP par défaut, sinon SMTP actif.
-async function pickAccount() {
+export async function pickAccount() {
   let account = await prisma.emailAccount.findFirst({
     where: { provider: 'OUTLOOK', isActive: true, isDefault: true, refreshToken: { not: null } },
   });
@@ -35,6 +35,20 @@ async function pickAccount() {
 
   if (!account) throw new Error("Aucun compte email configuré pour l'envoi (Outlook/M365 ou SMTP)");
   return { account, isOutlook };
+}
+
+// Un compte peut recevoir les réponses par email si c'est un compte Outlook (Graph)
+// ou si ses identifiants IMAP sont renseignés.
+export function canMonitorReplies(account: any): boolean {
+  return account?.provider === 'OUTLOOK' || !!account?.imapHost;
+}
+
+// Référence courte dérivée du jeton de décision, insérée dans l'objet des emails de
+// validation pour retrouver la demande quand le supérieur répond à l'email.
+export const REPLY_REF_PATTERN = /\[Réf:\s*([A-Fa-f0-9]{6,12})\]/;
+
+export function replyRefOf(request: { decisionToken: string }): string {
+  return request.decisionToken.replace(/-/g, '').slice(-8).toUpperCase();
 }
 
 // Envoi via SMTP générique (nodemailer)
@@ -74,6 +88,15 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
   }
 }
 
+// Version interne acceptant un compte déjà sélectionné (évite de le re-résoudre)
+export async function sendEmailWith(picked: { account: any; isOutlook: boolean }, options: SendEmailOptions): Promise<void> {
+  if (picked.isOutlook) {
+    await sendEmailViaGraph(picked.account, options);
+  } else {
+    await sendEmailViaSmtp(picked.account, options);
+  }
+}
+
 // === Templates des demandes ===
 
 const APP_NAME = 'Gestions Access';
@@ -106,6 +129,7 @@ interface EmailLayoutOptions {
   actions?: EmailAction[];
   footerNote?: string;
   footerLink?: { href: string; label: string };
+  notice?: { title: string; body: string } | null;
   preheader: string;
 }
 
@@ -138,7 +162,7 @@ function rowsHtml(rows: EmailRow[]): string {
 }
 
 function emailLayout(opts: EmailLayoutOptions): string {
-  const { title, badge, paragraphs, rows, actions, footerNote, footerLink, preheader } = opts;
+  const { title, badge, paragraphs, rows, actions, footerNote, footerLink, notice, preheader } = opts;
   const badgeHtml = badge
     ? `<span class="badge" style="display:inline-block;margin:0 0 14px;background:${badge.bg};color:${badge.color};padding:5px 14px;border-radius:999px;font-size:12px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif;">${badge.text}</span>`
     : '';
@@ -150,6 +174,12 @@ function emailLayout(opts: EmailLayoutOptions): string {
     .join('\n');
   const actionsHtml = actions?.length
     ? `<div style="margin:24px 0 6px;">${actionButtons(actions)}</div>`
+    : '';
+  const noticeHtml = notice
+    ? `<div class="notice" style="margin-top:20px;background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #d29922;border-radius:10px;padding:12px 16px;">
+        <p style="margin:0 0 4px;color:#92400e;font-size:13px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif;">${notice.title}</p>
+        <p style="margin:0;color:#78350f;font-size:13px;line-height:1.6;font-family:'Segoe UI',Arial,sans-serif;">${notice.body}</p>
+      </div>`
     : '';
   const footerLinkHtml = footerLink
     ? `<p style="margin:14px 0 0;"><a href="${footerLink.href}" style="color:#2563eb;text-decoration:underline;font-family:'Segoe UI',Arial,sans-serif;font-size:13px;">${footerLink.label}</a></p>`
@@ -175,6 +205,7 @@ function emailLayout(opts: EmailLayoutOptions): string {
     .row-label { color: #9ca3af !important; }
     .row-value { color: #f3f4f6 !important; }
     .footer-note { color: #6b7280 !important; }
+    .notice { background-color: #1a1a24 !important; border-color: #3f3f46 !important; }
   }
 </style>
 </head>
@@ -208,6 +239,7 @@ function emailLayout(opts: EmailLayoutOptions): string {
               ${rowsHtml(rows)}
             </table>
             ${actionsHtml}
+            ${noticeHtml}
           </td>
         </tr>
         <tr>
@@ -272,11 +304,13 @@ function decisionRows(request: any): EmailRow[] {
 // Email envoyé au supérieur hiérarchique avec les boutons Valider / Refuser
 export async function sendRequestToSuperior(request: any): Promise<void> {
   const frontendUrl = await resolveFrontendUrl();
+  const picked = await pickAccount();
   const reviewUrl = `${frontendUrl}/requests/review/${request.decisionToken}`;
   const requesterName = request.requesterName
     || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'l\'utilisateur');
   const typeName = request.type?.name || 'Demande';
-  const subject = `[Validation] Demande de ${requesterName} — ${typeName}`;
+  const replyRef = replyRefOf(request);
+  const subject = `[Validation][Réf: ${replyRef}] Demande de ${requesterName} — ${typeName}`;
 
   const bodyHtml = emailLayout({
     title: 'Demande de validation',
@@ -290,9 +324,15 @@ export async function sendRequestToSuperior(request: any): Promise<void> {
       { href: `${reviewUrl}?action=approve`, label: '✓ Valider', bg: '#16a34a' },
       { href: `${reviewUrl}?action=reject`, label: '✗ Refuser', bg: '#dc2626' },
     ],
+    notice: canMonitorReplies(picked.account)
+      ? {
+          title: 'Réponse par email (sans ouvrir l’application)',
+          body: 'Répondez simplement à cet email en écrivant VALIDER ou REFUSER (suivi de votre commentaire si vous le souhaitez) : votre réponse sera traitée automatiquement.',
+        }
+      : null,
     footerNote: 'Ce lien est à usage unique. La première réponse enregistrée fera foi.',
   });
-  await sendEmail({ to: request.superiorEmail, subject, bodyHtml });
+  await sendEmailWith(picked, { to: request.superiorEmail, subject, bodyHtml });
 }
 
 // Email de notification au demandeur après la décision du supérieur

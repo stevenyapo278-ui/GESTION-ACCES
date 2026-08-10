@@ -18,6 +18,7 @@ import documentRoutes from './routes/documents';
 import emailAccountRoutes from './routes/emailAccounts';
 import outlookOAuthRoutes from './routes/outlookOAuth';
 import requestRoutes from './routes/requests';
+import { startReplyMonitor } from './services/replyMonitor';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -67,6 +68,9 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📋 API base: http://localhost:${PORT}/api`);
   console.log(`⏰ Auto-backup scheduler started`);
+  console.log(`📬 Email replies monitor started`);
+
+  startReplyMonitor();
 
   const runBackupFromSettings = async () => {
     try {

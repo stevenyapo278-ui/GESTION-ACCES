@@ -5,6 +5,7 @@ import { EmailProvider } from '@prisma/client';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { Role } from '@prisma/client';
 import { resolveFrontendUrl, getNotificationEmail, parseEmailList, setSetting } from '../services/systemSettings';
+import { pollOnce } from '../services/replyMonitor';
 
 const router = Router();
 
@@ -165,6 +166,17 @@ router.delete('/:id', authenticate, authorize(Role.ADMIN), async (req: AuthReque
   } catch (error) {
     console.error('Delete email account error:', error);
     res.status(500).json({ error: 'Échec de la suppression du compte email' });
+  }
+});
+
+// POST /api/email-accounts/poll — Déclenche manuellement la surveillance des réponses email (admin)
+router.post('/poll', authenticate, authorize(Role.ADMIN), async (_req: AuthRequest, res: Response) => {
+  try {
+    const result = await pollOnce();
+    res.json(result);
+  } catch (error) {
+    console.error('Manual reply poll error:', error);
+    res.status(500).json({ error: 'Échec du déclenchement de la surveillance' });
   }
 });
 

@@ -24,7 +24,7 @@ function validateAnswers(type: { fields?: unknown }, data: unknown): Record<stri
 }
 
 // Applique la décision (approbation/refus) sur une demande PENDING
-async function applyDecision(
+export async function applyDecision(
   request: { id: string; status: RequestStatus },
   action: 'APPROVE' | 'REJECT',
   comment?: string
