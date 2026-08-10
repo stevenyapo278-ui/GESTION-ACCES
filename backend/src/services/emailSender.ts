@@ -364,9 +364,19 @@ export async function sendRequestDecisionToRequester(request: any): Promise<void
   await sendEmail({ to: requesterEmail, subject, bodyHtml, attachments: [await requestAttachment(request)] });
 }
 
-// Email de notification à l'équipe après la décision du supérieur
+// Email de notification à l'équipe après la décision du supérieur.
+// Le demandeur et le supérieur sont exclus de la liste : ils reçoivent déjà
+// leurs propres emails (évite les doublons quand leur adresse est dans les notifications).
 export async function sendRequestDecisionToAdmin(request: any): Promise<void> {
-  const recipients = await getNotificationEmails();
+  let recipients = await getNotificationEmails();
+  if (recipients.length === 0) return;
+
+  const requesterEmail = (request.requesterEmail || request.requester?.email || '').toLowerCase();
+  const superiorEmail = (request.superiorEmail || '').toLowerCase();
+  recipients = recipients.filter((addr) => {
+    const a = addr.toLowerCase();
+    return a !== requesterEmail && a !== superiorEmail;
+  });
   if (recipients.length === 0) return;
 
   const approved = request.status === 'APPROVED';
