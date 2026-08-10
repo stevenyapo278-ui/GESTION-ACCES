@@ -3,10 +3,17 @@ import prisma from '../lib/prisma';
 import { graphFetch } from './graphClient';
 import { resolveFrontendUrl, getNotificationEmails } from './systemSettings';
 
+export interface EmailAttachment {
+  filename: string;
+  contentType: string;
+  content: string | Buffer;
+}
+
 export interface SendEmailOptions {
   to: string | string[];
   subject: string;
   bodyHtml: string;
+  attachments?: EmailAttachment[];
 }
 
 // Sélection du compte d'envoi : priorité au compte Outlook (Graph API) par défaut,
@@ -52,7 +59,7 @@ export function replyRefOf(request: { decisionToken: string }): string {
 }
 
 // Envoi via SMTP générique (nodemailer)
-async function sendEmailViaSmtp(account: any, { to, subject, bodyHtml }: SendEmailOptions) {
+async function sendEmailViaSmtp(account: any, { to, subject, bodyHtml, attachments }: SendEmailOptions) {
   const transporter = nodemailer.createTransport({
     host: account.smtpHost,
     port: account.smtpPort || 587,
@@ -64,16 +71,23 @@ async function sendEmailViaSmtp(account: any, { to, subject, bodyHtml }: SendEma
     to: Array.isArray(to) ? to.join(', ') : to,
     subject,
     html: bodyHtml,
+    attachments: (attachments || []).map((a) => ({ filename: a.filename, contentType: a.contentType, content: a.content })),
   });
 }
 
 // Envoi via Microsoft Graph API (Outlook / Microsoft 365)
-async function sendEmailViaGraph(account: any, { to, subject, bodyHtml }: SendEmailOptions) {
+async function sendEmailViaGraph(account: any, { to, subject, bodyHtml, attachments }: SendEmailOptions) {
   const toRecipients = (Array.isArray(to) ? to : [to]).map((addr) => ({ emailAddress: { address: addr } }));
   const message = {
     subject,
     body: { contentType: 'HTML', content: bodyHtml },
     toRecipients,
+    attachments: (attachments || []).map((a) => ({
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: a.filename,
+      contentType: a.contentType,
+      contentBytes: Buffer.isBuffer(a.content) ? a.content.toString('base64') : Buffer.from(a.content).toString('base64'),
+    })),
   };
   const draft = await graphFetch(account, '/me/messages', { method: 'POST', body: JSON.stringify(message) });
   await graphFetch(account, `/me/messages/${draft.id}/send`, { method: 'POST' });
@@ -257,37 +271,78 @@ function emailLayout(opts: EmailLayoutOptions): string {
 </html>`.trim();
 }
 
-function requestRows(request: any): EmailRow[] {
+// Paires label/valeur des informations saisies par l'utilisateur (réutilisées par
+// le rendu HTML du mail et la pièce jointe récapitulative).
+function requestDataPairs(request: any): Array<{ label: string; value: string }> {
   const data = request.data && typeof request.data === 'object' ? request.data : {};
   const fields = Array.isArray(request.type?.fields) ? request.type.fields : [];
-  const rows: EmailRow[] = [];
+  const pairs: Array<{ label: string; value: string }> = [];
 
   const requesterName = request.requesterName
     || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'Utilisateur');
   const requesterEmail = request.requesterEmail || request.requester?.email || '';
-  rows.push({
+  pairs.push({
     label: 'Demandeur',
-    value: `${escapeHtml(requesterName)}${
-      requesterEmail ? ` <span style="font-weight:400;color:#64748b;">(${escapeHtml(requesterEmail)})</span>` : ''
-    }`,
+    value: requesterEmail ? `${requesterName} (${requesterEmail})` : requesterName,
   });
-  rows.push({ label: 'Type de demande', value: escapeHtml(request.type?.name || 'Demande') });
+  pairs.push({ label: 'Type de demande', value: request.type?.name || 'Demande' });
 
   for (const f of fields) {
-    const v = data[f.key];
-    if (f?.key && v !== undefined && v !== '') {
-      rows.push({ label: escapeHtml(f.label || f.key), value: escapeHtml(v) });
+    const value = data[f.key];
+    if (f?.key && value !== undefined && value !== '') {
+      pairs.push({ label: f.label || f.key, value: String(value) });
     }
   }
-  for (const [k, v] of Object.entries(data)) {
-    if (!fields.some((f: any) => f.key === k)) {
-      rows.push({ label: escapeHtml(k), value: escapeHtml(v) });
+  for (const [key, value] of Object.entries(data)) {
+    if (!fields.some((f: any) => f.key === key)) {
+      pairs.push({ label: key, value: String(value) });
     }
   }
 
-  if (request.details) rows.push({ label: 'Détails', value: escapeHtml(request.details) });
-  rows.push({ label: 'Date de soumission', value: escapeHtml(new Date(request.createdAt).toLocaleString('fr-FR')) });
-  return rows;
+  if (request.details) pairs.push({ label: 'Détails', value: String(request.details) });
+  pairs.push({ label: 'Date de soumission', value: new Date(request.createdAt).toLocaleString('fr-FR') });
+  return pairs;
+}
+
+// Pièce jointe récapitulative des informations renseignées par l'utilisateur
+export function requestAttachment(request: any): EmailAttachment {
+  const pairs = requestDataPairs(request);
+  const statusLabel = request.status === 'APPROVED' ? 'Validée' : request.status === 'REJECTED' ? 'Refusée' : 'En attente';
+  const width = Math.max(...pairs.map((p) => p.label.length), 10);
+
+  let text = 'DEMANDE D\'ACCÈS — GESTIONS ACCESS\n';
+  text += '='.repeat(46) + '\n\n';
+  for (const { label, value } of pairs) {
+    text += `${label.padEnd(width)} : ${value}\n`;
+  }
+  if (request.decidedAt) {
+    text += `\nDécision        : ${statusLabel}`;
+    if (request.decisionComment) text += `\nCommentaire     : ${request.decisionComment}`;
+    text += `\nDécision le     : ${new Date(request.decidedAt).toLocaleString('fr-FR')}\n`;
+  }
+
+  const ref = replyRefOf(request);
+  const typeSlug = (request.type?.name || 'demande')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .slice(0, 40);
+  return { filename: `Demande_${ref}_${typeSlug}.txt`, contentType: 'text/plain', content: text };
+}
+
+function requestRows(request: any): EmailRow[] {
+  const pairs = requestDataPairs(request);
+  const requesterEmail = request.requesterEmail || request.requester?.email || '';
+  return pairs.map(({ label, value }) => {
+    // Le demandeur garde sa forme enrichie (email atténué dans le mail)
+    const isRequester = label === 'Demandeur' && requesterEmail;
+    return {
+      label: escapeHtml(label),
+      value: isRequester
+        ? `${escapeHtml(value.split(' (')[0])} <span style="font-weight:400;color:#64748b;">(${escapeHtml(requesterEmail)})</span>`
+        : escapeHtml(value),
+    };
+  });
 }
 
 function decisionRows(request: any): EmailRow[] {
@@ -356,7 +411,7 @@ export async function sendRequestDecisionToRequester(request: any): Promise<void
     rows: decisionRows(request),
     footerLink: { href: `${frontendUrl}/requests`, label: 'Voir mes demandes dans l\'application' },
   });
-  await sendEmail({ to: requesterEmail, subject, bodyHtml });
+  await sendEmail({ to: requesterEmail, subject, bodyHtml, attachments: [requestAttachment(request)] });
 }
 
 // Email de notification à l'équipe après la décision du supérieur
@@ -382,5 +437,5 @@ export async function sendRequestDecisionToAdmin(request: any): Promise<void> {
     rows: decisionRows(request),
     footerLink: { href: `${frontendUrl}/requests`, label: 'Voir les demandes dans l\'application' },
   });
-  await sendEmail({ to: recipients, subject, bodyHtml });
+  await sendEmail({ to: recipients, subject, bodyHtml, attachments: [requestAttachment(request)] });
 }
