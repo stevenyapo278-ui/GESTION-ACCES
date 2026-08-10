@@ -318,17 +318,14 @@ export async function sendRequestToSuperior(request: any): Promise<void> {
 
   const bodyHtml = emailLayout({
     title: 'Demande de validation',
-    preheader: `Connectez-vous pour valider la demande de ${requesterName}.`,
+    preheader: `Connectez-vous pour répondre à la demande de ${requesterName}.`,
     paragraphs: [
       'Bonjour,',
       `${escapeHtml(requesterName)} a soumis une demande qui requiert votre validation.`,
-      '<strong>Connectez-vous avec vos identifiants Gestions Access</strong> puis cliquez sur l\'un des boutons ci-dessous pour enregistrer votre décision (votre identité sera enregistrée).',
+      '<strong>Connectez-vous avec vos identifiants Gestions Access</strong> puis cliquez sur le bouton ci-dessous : vous pourrez alors valider ou refuser la demande (votre identité sera enregistrée).',
     ],
     rows: requestRows(request),
-    actions: [
-      { href: `${reviewUrl}?action=approve`, label: '✓ Valider', bg: '#16a34a' },
-      { href: `${reviewUrl}?action=reject`, label: '✗ Refuser', bg: '#dc2626' },
-    ],
+    actions: [{ href: reviewUrl, label: 'Se connecter pour répondre', bg: '#2563eb' }],
     notice: canMonitorReplies(picked.account)
       ? {
           title: 'Réponse par email (sans connexion)',
