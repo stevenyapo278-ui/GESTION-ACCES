@@ -2,6 +2,8 @@ import nodemailer from 'nodemailer';
 import prisma from '../lib/prisma';
 import { graphFetch } from './graphClient';
 import { resolveFrontendUrl, getNotificationEmails } from './systemSettings';
+import { requestDataPairs, attachmentBaseName } from './requestData';
+import { buildRequestPdf } from './pdfGenerator';
 
 export interface EmailAttachment {
   filename: string;
@@ -271,63 +273,10 @@ function emailLayout(opts: EmailLayoutOptions): string {
 </html>`.trim();
 }
 
-// Paires label/valeur des informations saisies par l'utilisateur (réutilisées par
-// le rendu HTML du mail et la pièce jointe récapitulative).
-function requestDataPairs(request: any): Array<{ label: string; value: string }> {
-  const data = request.data && typeof request.data === 'object' ? request.data : {};
-  const fields = Array.isArray(request.type?.fields) ? request.type.fields : [];
-  const pairs: Array<{ label: string; value: string }> = [];
-
-  const requesterName = request.requesterName
-    || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'Utilisateur');
-  const requesterEmail = request.requesterEmail || request.requester?.email || '';
-  pairs.push({
-    label: 'Demandeur',
-    value: requesterEmail ? `${requesterName} (${requesterEmail})` : requesterName,
-  });
-  pairs.push({ label: 'Type de demande', value: request.type?.name || 'Demande' });
-
-  for (const f of fields) {
-    const value = data[f.key];
-    if (f?.key && value !== undefined && value !== '') {
-      pairs.push({ label: f.label || f.key, value: String(value) });
-    }
-  }
-  for (const [key, value] of Object.entries(data)) {
-    if (!fields.some((f: any) => f.key === key)) {
-      pairs.push({ label: key, value: String(value) });
-    }
-  }
-
-  if (request.details) pairs.push({ label: 'Détails', value: String(request.details) });
-  pairs.push({ label: 'Date de soumission', value: new Date(request.createdAt).toLocaleString('fr-FR') });
-  return pairs;
-}
-
-// Pièce jointe récapitulative des informations renseignées par l'utilisateur
-export function requestAttachment(request: any): EmailAttachment {
-  const pairs = requestDataPairs(request);
-  const statusLabel = request.status === 'APPROVED' ? 'Validée' : request.status === 'REJECTED' ? 'Refusée' : 'En attente';
-  const width = Math.max(...pairs.map((p) => p.label.length), 10);
-
-  let text = 'DEMANDE D\'ACCÈS — GESTIONS ACCESS\n';
-  text += '='.repeat(46) + '\n\n';
-  for (const { label, value } of pairs) {
-    text += `${label.padEnd(width)} : ${value}\n`;
-  }
-  if (request.decidedAt) {
-    text += `\nDécision        : ${statusLabel}`;
-    if (request.decisionComment) text += `\nCommentaire     : ${request.decisionComment}`;
-    text += `\nDécision le     : ${new Date(request.decidedAt).toLocaleString('fr-FR')}\n`;
-  }
-
-  const ref = replyRefOf(request);
-  const typeSlug = (request.type?.name || 'demande')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .slice(0, 40);
-  return { filename: `Demande_${ref}_${typeSlug}.txt`, contentType: 'text/plain', content: text };
+// Pièce jointe PDF récapitulative des informations renseignées par l'utilisateur
+export async function requestAttachment(request: any): Promise<EmailAttachment> {
+  const buffer = await buildRequestPdf(request);
+  return { filename: `${attachmentBaseName(request)}.pdf`, contentType: 'application/pdf', content: buffer };
 }
 
 function requestRows(request: any): EmailRow[] {
@@ -411,7 +360,7 @@ export async function sendRequestDecisionToRequester(request: any): Promise<void
     rows: decisionRows(request),
     footerLink: { href: `${frontendUrl}/requests`, label: 'Voir mes demandes dans l\'application' },
   });
-  await sendEmail({ to: requesterEmail, subject, bodyHtml, attachments: [requestAttachment(request)] });
+  await sendEmail({ to: requesterEmail, subject, bodyHtml, attachments: [await requestAttachment(request)] });
 }
 
 // Email de notification à l'équipe après la décision du supérieur
@@ -437,5 +386,5 @@ export async function sendRequestDecisionToAdmin(request: any): Promise<void> {
     rows: decisionRows(request),
     footerLink: { href: `${frontendUrl}/requests`, label: 'Voir les demandes dans l\'application' },
   });
-  await sendEmail({ to: recipients, subject, bodyHtml, attachments: [requestAttachment(request)] });
+  await sendEmail({ to: recipients, subject, bodyHtml, attachments: [await requestAttachment(request)] });
 }
