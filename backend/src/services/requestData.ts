@@ -35,6 +35,15 @@ export function requestDataPairs(request: any): RequestDataPair[] {
 
   if (request.details) pairs.push({ label: 'Détails', value: String(request.details) });
   pairs.push({ label: 'Date de soumission', value: new Date(request.createdAt).toLocaleString('fr-FR') });
+
+  const decider = request.decidedBy;
+  const deciderName = request.decidedByName || (decider ? `${decider.firstName} ${decider.lastName}` : '');
+  if (request.decidedAt && deciderName) {
+    pairs.push({
+      label: 'Décidé par',
+      value: decider?.email ? `${deciderName} (${decider.email})` : deciderName,
+    });
+  }
   return pairs;
 }
 

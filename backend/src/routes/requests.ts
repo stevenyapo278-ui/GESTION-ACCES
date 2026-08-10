@@ -27,7 +27,8 @@ function validateAnswers(type: { fields?: unknown }, data: unknown): Record<stri
 export async function applyDecision(
   request: { id: string; status: RequestStatus },
   action: 'APPROVE' | 'REJECT',
-  comment?: string
+  comment?: string,
+  decidedBy?: string | null
 ) {
   if (request.status !== RequestStatus.PENDING) {
     throw Object.assign(new Error('Cette demande a déjà reçu une réponse'), { status: 409, requestStatus: request.status });
@@ -39,6 +40,7 @@ export async function applyDecision(
       status: action === 'APPROVE' ? RequestStatus.APPROVED : RequestStatus.REJECTED,
       decidedAt: new Date(),
       decisionComment: comment || null,
+      decidedBy: decidedBy ?? null,
     },
   });
 }
@@ -47,8 +49,9 @@ export async function applyDecision(
 // PUBLIC ROUTES (no auth required — lien de décision envoyé par email)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// GET /api/requests/review/:token — Fetch request for the decision page (public)
-router.get('/review/:token', async (req: Request, res: Response) => {
+// GET /api/requests/review/:token — Fetch request for the decision page
+// (authentifié : seul le supérieur destinataire peut consulter/statuer)
+router.get('/review/:token', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const request = await prisma.request.findUnique({
       where: { decisionToken: req.params.token },
@@ -60,6 +63,11 @@ router.get('/review/:token', async (req: Request, res: Response) => {
 
     if (!request) {
       res.status(404).json({ error: 'Demande introuvable ou lien invalide' });
+      return;
+    }
+
+    if (request.superiorEmail.toLowerCase() !== req.user!.email.toLowerCase()) {
+      res.status(403).json({ error: 'Cette demande ne vous a pas été adressée' });
       return;
     }
 
@@ -83,8 +91,8 @@ router.get('/review/:token', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/requests/review/:token — Approve or reject a request (public)
-router.post('/review/:token', async (req: Request, res: Response) => {
+// POST /api/requests/review/:token — Approve or reject a request (supérieur connecté)
+router.post('/review/:token', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { action, comment } = req.body;
     if (!['APPROVE', 'REJECT'].includes(action)) {
@@ -105,19 +113,26 @@ router.post('/review/:token', async (req: Request, res: Response) => {
       return;
     }
 
+    if (request.superiorEmail.toLowerCase() !== req.user!.email.toLowerCase()) {
+      res.status(403).json({ error: 'Cette demande ne vous a pas été adressée' });
+      return;
+    }
+
     if (request.status !== RequestStatus.PENDING) {
       res.status(409).json({ error: 'Cette demande a déjà reçu une réponse', status: request.status });
       return;
     }
 
-    const updated = await applyDecision(request, action as 'APPROVE' | 'REJECT', comment);
+    const updated = await applyDecision(request, action as 'APPROVE' | 'REJECT', comment, req.user!.id);
 
     // Notifier l'équipe et le demandeur par email (échec d'envoi non bloquant)
+    const decider = { firstName: req.user!.firstName, lastName: req.user!.lastName, email: req.user!.email };
     try {
       await sendRequestDecisionToAdmin({
         ...updated,
         requester: request.requester,
         type: request.type,
+        decidedBy: decider,
       });
     } catch (err) {
       console.error('Notification email error:', (err as Error).message);
@@ -128,6 +143,7 @@ router.post('/review/:token', async (req: Request, res: Response) => {
         ...updated,
         requester: request.requester,
         type: request.type,
+        decidedBy: decider,
       });
     } catch (err) {
       console.error('Requester notification email error:', (err as Error).message);
@@ -322,13 +338,15 @@ router.post('/decide/:id', authenticate, async (req: AuthRequest, res: Response)
       return;
     }
 
-    const updated = await applyDecision(request, action as 'APPROVE' | 'REJECT', comment);
+    const updated = await applyDecision(request, action as 'APPROVE' | 'REJECT', comment, req.user!.id);
 
+    const decider = { firstName: req.user!.firstName, lastName: req.user!.lastName, email: req.user!.email };
     try {
       await sendRequestDecisionToAdmin({
         ...updated,
         requester: request.requester,
         type: request.type,
+        decidedBy: decider,
       });
     } catch (err) {
       console.error('Notification email error:', (err as Error).message);
@@ -339,6 +357,7 @@ router.post('/decide/:id', authenticate, async (req: AuthRequest, res: Response)
         ...updated,
         requester: request.requester,
         type: request.type,
+        decidedBy: decider,
       });
     } catch (err) {
       console.error('Requester notification email error:', (err as Error).message);

@@ -318,10 +318,11 @@ export async function sendRequestToSuperior(request: any): Promise<void> {
 
   const bodyHtml = emailLayout({
     title: 'Demande de validation',
-    preheader: `${requesterName} a soumis une demande qui requiert votre validation.`,
+    preheader: `Connectez-vous pour valider la demande de ${requesterName}.`,
     paragraphs: [
       'Bonjour,',
-      `${escapeHtml(requesterName)} a soumis une demande qui requiert votre validation. Voici le récapitulatif :`,
+      `${escapeHtml(requesterName)} a soumis une demande qui requiert votre validation.`,
+      '<strong>Connectez-vous avec vos identifiants Gestions Access</strong> puis cliquez sur l\'un des boutons ci-dessous pour enregistrer votre décision (votre identité sera enregistrée).',
     ],
     rows: requestRows(request),
     actions: [
@@ -330,11 +331,11 @@ export async function sendRequestToSuperior(request: any): Promise<void> {
     ],
     notice: canMonitorReplies(picked.account)
       ? {
-          title: 'Réponse par email (sans ouvrir l’application)',
-          body: 'Répondez simplement à cet email en écrivant VALIDER ou REFUSER (suivi de votre commentaire si vous le souhaitez) : votre réponse sera traitée automatiquement.',
+          title: 'Réponse par email (sans connexion)',
+          body: 'Vous n\'avez pas de compte ? Répondez simplement à cet email en écrivant VALIDER ou REFUSER (suivi de votre commentaire si vous le souhaitez) : votre réponse sera traitée automatiquement.',
         }
       : null,
-    footerNote: 'Ce lien est à usage unique. La première réponse enregistrée fera foi.',
+    footerNote: 'Ce lien est à usage unique, nécessite d\'être connecté et ne peut être utilisé que par le supérieur destinataire. La première réponse enregistrée fera foi.',
   });
   await sendEmailWith(picked, { to: request.superiorEmail, subject, bodyHtml });
 }

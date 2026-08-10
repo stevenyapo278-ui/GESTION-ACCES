@@ -49,6 +49,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('user', JSON.stringify(userData));
     setToken(newToken);
     setUser(userData);
+    const target = sessionStorage.getItem('authRedirect');
+    sessionStorage.removeItem('authRedirect');
+    if (target) {
+      window.location.href = target;
+    }
   }, []);
 
   const register = useCallback(async (data: { email: string; password: string; firstName: string; lastName: string }) => {
