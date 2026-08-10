@@ -38,10 +38,11 @@ export function requestDataPairs(request: any): RequestDataPair[] {
 
   const decider = request.decidedBy;
   const deciderName = request.decidedByName || (decider ? `${decider.firstName} ${decider.lastName}` : '');
+  const deciderEmail = request.decidedByEmail || decider?.email || '';
   if (request.decidedAt && deciderName) {
     pairs.push({
       label: 'Décidé par',
-      value: decider?.email ? `${deciderName} (${decider.email})` : deciderName,
+      value: deciderEmail ? `${deciderName} (${deciderEmail})` : deciderName,
     });
   }
   return pairs;

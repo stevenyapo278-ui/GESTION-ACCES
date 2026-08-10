@@ -100,16 +100,28 @@ export async function findPendingByRef(ref: string) {
   return pending.find((r) => replyRefOf(r) === ref.toUpperCase()) || null;
 }
 
+interface ReplyMessage {
+  id: string;
+  subject?: string;
+  body?: any;
+  isRead?: boolean;
+  from?: { emailAddress?: { name?: string; address?: string } };
+}
+
 // Applique la décision issue d'une réponse email, puis notifie (comme le bouton du site)
-export async function applyReplyDecision(request: any, decision: ReplyDecision): Promise<void> {
+// decider = informations de l'expéditeur de la réponse (nom + email), affichées dans les emails/PDF
+export async function applyReplyDecision(request: any, decision: ReplyDecision, decider?: { name?: string; email?: string }): Promise<void> {
   const updated = await applyDecision(request, decision.action as 'APPROVE' | 'REJECT', decision.comment);
+  const deciderContext = decider?.name || decider?.email
+    ? { decidedByName: decider!.name || decider!.email, decidedByEmail: decider!.email || '' }
+    : {};
   try {
-    await sendRequestDecisionToAdmin({ ...updated, requester: request.requester, type: request.type });
+    await sendRequestDecisionToAdmin({ ...updated, requester: request.requester, type: request.type, ...deciderContext });
   } catch (err) {
     console.error('Reply decision notification (admin) error:', (err as Error).message);
   }
   try {
-    await sendRequestDecisionToRequester({ ...updated, requester: request.requester, type: request.type });
+    await sendRequestDecisionToRequester({ ...updated, requester: request.requester, type: request.type, ...deciderContext });
   } catch (err) {
     console.error('Reply decision notification (requester) error:', (err as Error).message);
   }
@@ -123,7 +135,7 @@ export async function pollOutlookReplies(account: any): Promise<{ checked: numbe
     account,
     '/me/messages?$top=50&$orderby=receivedDateTime%20desc&$select=id,subject,body,isRead'
   );
-  const messages: Array<{ id: string; subject?: string; body?: any; isRead?: boolean }> = data?.value || [];
+  const messages: ReplyMessage[] = data?.value || [];
   result.checked = messages.length;
 
   for (const message of messages) {
@@ -142,8 +154,12 @@ export async function pollOutlookReplies(account: any): Promise<{ checked: numbe
 
     const decision = extractReplyDecision(bodyText(message));
     if (decision.action) {
+      const from = message.from?.emailAddress || {};
+      const decider = from.address
+        ? { name: from.name || from.address, email: from.address }
+        : undefined;
       try {
-        await applyReplyDecision(request, decision);
+        await applyReplyDecision(request, decision, decider);
         result.decided += 1;
       } catch (err) {
         console.error('Reply decision error:', (err as Error).message);
