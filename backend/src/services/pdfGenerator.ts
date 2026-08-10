@@ -172,12 +172,13 @@ function drawFooter(doc: PDFKit.PDFDocument): void {
 }
 
 export function buildRequestPdf(request: any): Promise<Buffer> {
+  const title = (request.type?.name || 'Demande').toUpperCase();
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: 'A4',
       margin: 40,
       info: {
-        Title: `Demande ${request.type?.name || ''}`,
+        Title: title,
         Author: 'Gestions Access',
         Producer: 'Gestions Access',
       },
@@ -195,7 +196,7 @@ export function buildRequestPdf(request: any): Promise<Buffer> {
       .fontSize(16)
       .fillColor(VALUE_COLOR)
       .font('Helvetica-Bold')
-      .text('DEMANDE D\'ACCÈS', 40, 92);
+      .text(title, 40, 92);
     doc
       .fontSize(9)
       .fillColor(LABEL_COLOR)

@@ -36,7 +36,18 @@ export default function ReviewRequest() {
     if (!token) return;
     requestsAPI
       .getReview(token)
-      .then((res) => setData(res.data))
+      .then((res) => {
+        setData(res.data);
+        if (res.data.status !== 'PENDING') {
+          setDecided({
+            status: res.data.status,
+            message:
+              res.data.status === 'APPROVED'
+                ? 'Cette demande a déjà été validée par le supérieur hiérarchique.'
+                : 'Cette demande a déjà été refusée par le supérieur hiérarchique.',
+          });
+        }
+      })
       .catch((err) => setError(err.response?.data?.error || 'Erreur lors du chargement'))
       .finally(() => setLoading(false));
   }, [token]);
@@ -49,9 +60,10 @@ export default function ReviewRequest() {
       .decide(token, { action, comment: comment.trim() || undefined })
       .then((res) => setDecided({ status: action, message: res.data.message }))
       .catch((err) => {
-        const msg = err.response?.data?.error || 'Erreur lors de l\'envoi';
-        if (err.response?.data?.status) setDecided({ status: err.response.data.status, message: msg });
-        else setDecideError(msg);
+        const serverStatus = err.response?.data?.status;
+        if (serverStatus === 'APPROVED') setDecided({ status: serverStatus, message: 'Cette demande a déjà été validée.' });
+        else if (serverStatus === 'REJECTED') setDecided({ status: serverStatus, message: 'Cette demande a déjà été refusée.' });
+        else setDecideError(err.response?.data?.error || 'Erreur lors de l\'envoi');
       })
       .finally(() => setDeciding(false));
   };
@@ -94,6 +106,17 @@ export default function ReviewRequest() {
                 {decided.status === 'APPROVED' ? 'Demande validée' : decided.status === 'REJECTED' ? 'Demande refusée' : 'Réponse déjà enregistrée'}
               </h2>
               <p className="text-sm text-zinc-500 mt-2">{decided.message}</p>
+              {data?.decidedAt && (
+                <p className="text-xs text-zinc-400 mt-2">
+                  Enregistrée le {new Date(data.decidedAt).toLocaleString('fr-FR')}
+                </p>
+              )}
+              {data?.decisionComment && (
+                <div className="mt-3 rounded-lg bg-zinc-50 p-3 text-left text-sm text-zinc-700">
+                  <span className="font-medium text-zinc-900">Commentaire du supérieur :</span>
+                  <span className="whitespace-pre-wrap"> {data.decisionComment}</span>
+                </div>
+              )}
               <p className="text-xs text-zinc-400 mt-4">Vous pouvez fermer cette page.</p>
             </div>
           ) : data ? (
