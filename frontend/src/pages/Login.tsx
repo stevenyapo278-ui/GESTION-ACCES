@@ -89,12 +89,12 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label" htmlFor="email">Email</label>
+              <label className="label" htmlFor="email">Email ou identifiant</label>
               <input
                 id="email"
                 type="email"
                 className="input"
-                placeholder="vous@exemple.com"
+                placeholder="vous@exemple.com ou votre identifiant"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

@@ -9,6 +9,16 @@ import { Role } from '@prisma/client';
 
 const router = Router();
 
+// Domaine email optionnel : permet la connexion avec l'identifiant seul (ex. « styapo »)
+// au lieu de l'adresse complète (ex. « styapo@prosuma.ci »). Vide = désactivé.
+const AUTH_EMAIL_DOMAIN = process.env.AUTH_EMAIL_DOMAIN?.trim() || '';
+
+function resolveLoginIdentifier(input: string): string {
+  const value = String(input).trim().toLowerCase();
+  if (value.includes('@')) return value;
+  return AUTH_EMAIL_DOMAIN ? `${value}@${AUTH_EMAIL_DOMAIN}` : value;
+}
+
 // POST /api/auth/register
 router.post('/register', async (req: AuthRequest, res: Response) => {
   try {
@@ -51,7 +61,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const normalizedEmail = String(email).trim().toLowerCase();
+    const normalizedEmail = resolveLoginIdentifier(email);
     const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
     // 1) Authentification locale (comptes en base)
