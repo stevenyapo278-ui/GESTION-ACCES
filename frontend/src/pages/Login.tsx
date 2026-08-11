@@ -92,7 +92,9 @@ export default function Login() {
               <label className="label" htmlFor="email">Email ou identifiant</label>
               <input
                 id="email"
-                type="email"
+                type="text"
+                inputMode="email"
+                autoComplete="username"
                 className="input"
                 placeholder="vous@exemple.com ou votre identifiant"
                 value={email}
