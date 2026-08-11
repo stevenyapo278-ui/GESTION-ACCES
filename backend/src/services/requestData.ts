@@ -6,14 +6,24 @@ export interface RequestDataPair {
   value: string;
 }
 
+// Nom affiché : prénom seul quand il est identique au nom (évite « akonate akonate »)
+export function displayName(firstName?: string | null, lastName?: string | null): string {
+  const first = firstName?.trim() || '';
+  const last = lastName?.trim() || '';
+  if (!first && !last) return '';
+  if (!last || first.toLowerCase() === last.toLowerCase()) return first || last;
+  return `${first} ${last}`;
+}
+
 // Paires label/valeur des informations saisies par l'utilisateur
 export function requestDataPairs(request: any): RequestDataPair[] {
   const data = request.data && typeof request.data === 'object' ? request.data : {};
   const fields = Array.isArray(request.type?.fields) ? request.type.fields : [];
   const pairs: RequestDataPair[] = [];
 
-  const requesterName = request.requesterName
-    || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'Utilisateur');
+  const requesterName = request.requester
+    ? displayName(request.requester.firstName, request.requester.lastName)
+    : (request.requesterName || 'Utilisateur');
   const requesterEmail = request.requesterEmail || request.requester?.email || '';
   pairs.push({
     label: 'Demandeur',
@@ -37,7 +47,7 @@ export function requestDataPairs(request: any): RequestDataPair[] {
   pairs.push({ label: 'Date de soumission', value: new Date(request.createdAt).toLocaleString('fr-FR') });
 
   const decider = request.decidedBy;
-  const deciderName = request.decidedByName || (decider ? `${decider.firstName} ${decider.lastName}` : '');
+  const deciderName = request.decidedByName || (decider ? displayName(decider.firstName, decider.lastName) : '');
   const deciderEmail = request.decidedByEmail || decider?.email || '';
   if (request.decidedAt && deciderName) {
     pairs.push({

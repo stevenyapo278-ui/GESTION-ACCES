@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import prisma from '../lib/prisma';
 import { graphFetch } from './graphClient';
 import { resolveFrontendUrl, getNotificationEmails } from './systemSettings';
-import { requestDataPairs, attachmentBaseName } from './requestData';
+import { requestDataPairs, attachmentBaseName, displayName } from './requestData';
 import { buildRequestPdf } from './pdfGenerator';
 
 export interface EmailAttachment {
@@ -310,8 +310,9 @@ export async function sendRequestToSuperior(request: any): Promise<void> {
   const frontendUrl = await resolveFrontendUrl();
   const picked = await pickAccount();
   const reviewUrl = `${frontendUrl}/requests/review/${request.decisionToken}`;
-  const requesterName = request.requesterName
-    || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'l\'utilisateur');
+  const requesterName = request.requester
+    ? displayName(request.requester.firstName, request.requester.lastName)
+    : (request.requesterName || 'l\'utilisateur');
   const typeName = request.type?.name || 'Demande';
   const replyRef = replyRefOf(request);
   const subject = `[Validation][Réf: ${replyRef}] Demande de ${requesterName} — ${typeName}`;
@@ -377,8 +378,9 @@ export async function sendRequestDecisionToAdmin(request: any): Promise<void> {
   if (recipients.length === 0) return;
 
   const approved = request.status === 'APPROVED';
-  const requesterName = request.requesterName
-    || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'l\'utilisateur');
+  const requesterName = request.requester
+    ? displayName(request.requester.firstName, request.requester.lastName)
+    : (request.requesterName || 'l\'utilisateur');
   const typeName = request.type?.name || 'Demande';
   const subject = `${approved ? '✅ Validée' : '❌ Refusée'} — Demande de ${requesterName} (${typeName})`;
   const badge = approved

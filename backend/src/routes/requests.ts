@@ -4,6 +4,7 @@ import { RequestStatus, Role } from '@prisma/client';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { sendRequestToSuperior, sendRequestDecisionToAdmin, sendRequestDecisionToRequester } from '../services/emailSender';
 import { getNotificationEmail } from '../services/systemSettings';
+import { displayName } from '../services/requestData';
 
 const router = Router();
 
@@ -75,7 +76,7 @@ router.get('/review/:token', authenticate, async (req: AuthRequest, res: Respons
       id: request.id,
       typeName: request.type.name,
       typeDescription: request.type.description,
-      requesterName: request.requesterName || (request.requester ? `${request.requester.firstName} ${request.requester.lastName}` : 'Utilisateur'),
+      requesterName: request.requester ? displayName(request.requester.firstName, request.requester.lastName) : (request.requesterName || 'Utilisateur'),
       requesterEmail: request.requesterEmail || request.requester?.email || '',
       details: request.details,
       data: request.data,
@@ -421,7 +422,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       data: {
         typeId,
         requesterId: req.user!.id,
-        requesterName: `${req.user!.firstName} ${req.user!.lastName}`,
+        requesterName: displayName(req.user!.firstName, req.user!.lastName),
         requesterEmail: req.user!.email,
         superiorEmail,
         details: details || null,
