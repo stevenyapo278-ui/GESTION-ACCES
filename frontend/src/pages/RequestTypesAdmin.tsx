@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Plus, Loader2, Pencil, Trash2, ToggleRight, ToggleLeft, X, ListPlus, Settings2 } from 'lucide-react';
+import { Plus, Loader2, Pencil, Trash2, ToggleRight, ToggleLeft, X, ListPlus, Settings2, Search } from 'lucide-react';
 import { requestsAPI } from '../services/api';
 import type { RequestField } from '../types';
 import toast from 'react-hot-toast';
@@ -141,6 +141,7 @@ export default function RequestTypesAdmin() {
   const [form, setForm] = useState({ name: '', description: '' });
   const [createFields, setCreateFields] = useState<RequestField[]>([]);
   const [editing, setEditing] = useState<RequestType | null>(null);
+  const [search, setSearch] = useState('');
 
   const { data: types, isLoading } = useQuery<RequestType[]>({
     queryKey: ['request-types-all'],
@@ -231,6 +232,17 @@ export default function RequestTypesAdmin() {
       )}
 
       <div className="card overflow-hidden">
+        <div className="p-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
+          <div className="relative max-w-sm">
+            <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input
+              className="input pl-9"
+              placeholder="Rechercher un type, une description, un champ..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
             <div className="size-8 border-2 border-accent-blue border-t-transparent rounded-full animate-spin" />
@@ -249,7 +261,12 @@ export default function RequestTypesAdmin() {
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-                {types?.map((t) => (
+                {types?.filter((t) => {
+                  const q = search.trim().toLowerCase();
+                  if (!q) return true;
+                  const fieldLabels = (t.fields || []).map((f) => f.label).join(' ');
+                  return [t.name, t.description, fieldLabels].some((v) => v?.toLowerCase().includes(q));
+                }).map((t) => (
                   <tr key={t.id} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-5 py-4 font-medium" style={{ color: 'var(--text-primary)' }}>{t.name}</td>
                     <td className="px-5 py-4 text-sm text-zinc-500">{t.description || '—'}</td>
@@ -288,6 +305,17 @@ export default function RequestTypesAdmin() {
                     </td>
                   </tr>
                 ))}
+                {types && search.trim() && types.filter((t) => {
+                  const q = search.trim().toLowerCase();
+                  const fieldLabels = (t.fields || []).map((f) => f.label).join(' ');
+                  return [t.name, t.description, fieldLabels].some((v) => v?.toLowerCase().includes(q));
+                }).length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-8 text-center text-sm text-zinc-500">
+                      Aucun type ne correspond à « {search} »
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
