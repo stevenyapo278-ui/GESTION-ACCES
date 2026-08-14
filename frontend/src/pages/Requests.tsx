@@ -26,6 +26,7 @@ import {
   ArrowRight,
   ArrowLeft,
   AlertCircle,
+  Search,
 } from 'lucide-react';
 import { requestsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -168,6 +169,7 @@ export default function Requests() {
   const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
   const [reviewBusy, setReviewBusy] = useState<Record<string, string | null>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const { data: types, isLoading: typesLoading } = useQuery<RequestType[]>({
     queryKey: ['request-types'],
@@ -311,6 +313,26 @@ export default function Requests() {
       .finally(() => setReviewBusy((prev) => ({ ...prev, [requestId]: null })));
   };
 
+  const matchesFilters = (r: RequestItem): boolean => {
+    if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const haystack = [
+      r.type?.name,
+      requesterDisplay(r),
+      requesterEmail(r),
+      r.superiorEmail,
+      r.details,
+      answerSummary(r),
+      statusConfig[r.status].label,
+    ].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(q);
+  };
+
+  const filteredMy = myRequests?.filter(matchesFilters);
+  const filteredReview = reviewRequests?.filter(matchesFilters);
+  const filteredAll = allRequests?.filter(matchesFilters);
+
   const tabs: Array<{ key: typeof tab; label: string; icon: React.ElementType; badge?: number; show: boolean }> = [
     { key: 'mine', label: 'Mes demandes', icon: ClipboardList, badge: myRequests?.length, show: true },
     { key: 'review', label: 'À valider', icon: ShieldCheck, badge: reviewRequests?.length, show: true },
@@ -438,6 +460,41 @@ export default function Requests() {
         })}
       </div>
 
+      {/* ─── Recherche + filtres ────────────────────────────── */}
+      <div className="card flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-500" />
+          <input
+            className="input !pl-9"
+            placeholder="Rechercher par type, demandeur, supérieur, email, statut..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-200 cursor-pointer"
+              title="Effacer"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Filter className="size-4 text-zinc-500" />
+          <select
+            className="input !w-auto !py-2 cursor-pointer"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="ALL">Tous les statuts</option>
+            <option value="PENDING">En attente</option>
+            <option value="APPROVED">Validées</option>
+            <option value="REJECTED">Refusées</option>
+          </select>
+        </div>
+      </div>
+
       {/* ─── Mes demandes ───────────────────────────────────── */}
       {tab === 'mine' && (
         <div className="card overflow-hidden">
@@ -457,7 +514,7 @@ export default function Requests() {
             <div className="flex items-center justify-center h-40">
               <div className="size-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : myRequests && myRequests.length > 0 ? (
+          ) : filteredMy && filteredMy.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="table-wrap w-full">
                 <thead>
@@ -470,7 +527,7 @@ export default function Requests() {
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-                  {myRequests.map((r) => {
+                  {filteredMy.map((r) => {
                     const expanded = expandedId === r.id;
                     return (
                       <Fragment key={r.id}>
@@ -529,7 +586,7 @@ export default function Requests() {
               </table>
             </div>
           ) : (
-            <EmptyState icon={Inbox} title="Aucune demande pour le moment" hint="Soumettez votre première demande via le bouton « Nouvelle demande »." />
+            <EmptyState icon={Inbox} title={search || statusFilter !== 'ALL' ? 'Aucun résultat' : 'Aucune demande pour le moment'} hint={search || statusFilter !== 'ALL' ? 'Aucune demande ne correspond à votre recherche ou à vos filtres.' : 'Soumettez votre première demande via le bouton « Nouvelle demande ».'} />
           )}
         </div>
       )}
@@ -553,9 +610,9 @@ export default function Requests() {
             <div className="flex items-center justify-center h-40">
               <div className="size-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : reviewRequests && reviewRequests.length > 0 ? (
+          ) : filteredReview && filteredReview.length > 0 ? (
             <div className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-              {reviewRequests.map((r) => {
+              {filteredReview.map((r) => {
                 const name = requesterDisplay(r);
                 return (
                   <div key={r.id} className="p-6 space-y-4 animate-fade-in hover:bg-white/[0.02] transition-colors">
@@ -618,7 +675,7 @@ export default function Requests() {
               })}
             </div>
           ) : (
-            <EmptyState icon={ShieldCheck} title="Rien à valider" hint="Lorsqu'une demande vous sera adressée, elle apparaîtra ici pour validation." />
+            <EmptyState icon={ShieldCheck} title={search || statusFilter !== 'ALL' ? 'Aucun résultat' : 'Rien à valider'} hint={search || statusFilter !== 'ALL' ? 'Aucune demande ne correspond à votre recherche ou à vos filtres.' : 'Lorsqu\'une demande vous sera adressée, elle apparaîtra ici pour validation.'} />
           )}
         </div>
       )}
@@ -636,25 +693,12 @@ export default function Requests() {
                 <p className="text-xs text-zinc-500">Vue globale de toutes les demandes de l'application.</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="size-4 text-zinc-500" />
-              <select
-                className="input !w-auto !py-2 cursor-pointer"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="ALL">Tous les statuts</option>
-                <option value="PENDING">En attente</option>
-                <option value="APPROVED">Validées</option>
-                <option value="REJECTED">Refusées</option>
-              </select>
-            </div>
           </div>
           {allLoading ? (
             <div className="flex items-center justify-center h-40">
               <div className="size-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : allRequests && allRequests.length > 0 ? (
+          ) : filteredAll && filteredAll.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="table-wrap w-full">
                 <thead>
@@ -667,7 +711,7 @@ export default function Requests() {
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: 'var(--border-color)' }}>
-                  {allRequests.map((r) => {
+                  {filteredAll.map((r) => {
                     const name = requesterDisplay(r);
                     const expanded = expandedId === r.id;
                     return (
