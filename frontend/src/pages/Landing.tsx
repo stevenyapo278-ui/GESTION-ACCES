@@ -5,7 +5,6 @@ import {
   LogIn,
   FileText,
   Download,
-  Mail,
   Sun,
   Moon,
   ShieldCheck,
@@ -182,149 +181,145 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Demande en ligne (connexion requise) */}
-      <section id="demande" className={`py-16 md:py-20 px-4 scroll-mt-16 transition-colors duration-300 ${softSection}`}>
-        <div className="max-w-3xl mx-auto">
+      {/* Deux méthodes : demande en ligne OU formulaire papier (côte à côte) */}
+      <section className={`py-16 md:py-20 px-4 transition-colors duration-300 ${softSection}`}>
+        <div className="max-w-5xl mx-auto">
           <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-5 bg-gold-400/10 border-gold-400/30">
-              <span className="size-6 rounded-full bg-gradient-to-br from-gold-400 to-blue-500 text-white text-xs font-bold flex items-center justify-center">1</span>
-              <span className={`text-xs font-semibold uppercase tracking-widest ${goldText}`}>Demande en ligne</span>
-            </div>
             <h2 className={`text-3xl md:text-4xl font-bold ${heading}`}>
-              <span className="text-gradient">Connectez-vous</span> pour faire votre demande
+              Deux façons de <span className="text-gradient">faire votre demande</span>
             </h2>
             <p className={`${body} mt-3 max-w-xl mx-auto leading-relaxed`}>
-              La création de demande en ligne est réservée aux utilisateurs. Identifiez-vous
-              pour accéder au formulaire : votre supérieur hiérarchique recevra un email avec
-              les boutons Valider / Refuser, et l'équipe sera notifiée de la décision.
+              Choisissez la méthode qui vous convient : la demande en ligne, ou le formulaire
+              papier transmis par email.
             </p>
           </div>
 
-          <div className={`rounded-2xl border p-10 text-center shadow-2xl transition-colors duration-300 ${
-            isDark ? 'bg-space-900/80 border-space-800/60 shadow-black/30' : 'bg-white border-zinc-200 shadow-zinc-200/60'
-          }`}>
-            {user ? (
-              <>
-                <div className={`size-16 rounded-full flex items-center justify-center mx-auto mb-5 ${
-                  isDark ? 'bg-gold-400/10' : 'bg-gold-50'
-                }`}>
-                  <ShieldCheck className={`size-8 ${goldText}`} />
-                </div>
-                <h3 className={`text-xl font-semibold ${heading} mb-2`}>Vous êtes connecté</h3>
-                <p className={`${body} max-w-md mx-auto leading-relaxed mb-8`}>
-                  Vous pouvez accéder au formulaire de demande depuis l'application.
-                </p>
-                <button
-                  onClick={() => navigate('/')}
-                  className="btn btn-primary text-sm"
-                >
-                  <ArrowRight className="size-4" />
-                  Accéder à l'application
-                </button>
-              </>
-            ) : (
-              <>
-                <div className={`size-16 rounded-full flex items-center justify-center mx-auto mb-5 ${
-                  isDark ? 'bg-gold-400/10' : 'bg-gold-50'
-                }`}>
-                  <LogIn className={`size-8 ${goldText}`} />
-                </div>
-                <h3 className={`text-xl font-semibold ${heading} mb-2`}>Connexion requise</h3>
-                <p className={`${body} max-w-md mx-auto leading-relaxed mb-8`}>
-                  Utilisez votre identifiant habituel pour accéder au formulaire de demande en ligne.
-                </p>
-                <Link
-                  to="/login"
-                  className="btn btn-primary text-sm"
-                >
-                  <LogIn className="size-4" />
-                  Se connecter
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Downloadable form documents */}
-      <section id="formulaires" className="py-16 md:py-20 px-4 scroll-mt-16">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-5 bg-gold-400/10 border-gold-400/30">
-              <span className="size-6 rounded-full bg-gradient-to-br from-gold-400 to-blue-500 text-white text-xs font-bold flex items-center justify-center">2</span>
-              <span className={`text-xs font-semibold uppercase tracking-widest ${goldText}`}>Formulaire à télécharger</span>
-            </div>
-            <h2 className={`text-3xl md:text-4xl font-bold ${heading}`}>
-              Besoin d'un <span className="text-gradient">formulaire papier</span> ?
-            </h2>
-            <p className={`${body} mt-3 max-w-xl mx-auto leading-relaxed`}>
-              Téléchargez le formulaire correspondant à votre demande, imprimez-le ou remplissez-le,
-              puis transmettez-le nous par email.
-            </p>
-          </div>
-
-          {documents.length === 0 ? (
-            <div className={`text-center py-12 rounded-2xl border border-dashed ${isDark ? 'text-zinc-500 border-space-700' : 'text-zinc-400 border-zinc-300'}`}>
-              <FileText className="size-12 mx-auto mb-3 opacity-40" />
-              <p>Aucun formulaire disponible pour le moment.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  className={`rounded-2xl border p-5 md:p-6 flex flex-col md:flex-row md:items-center gap-4 transition-all duration-300 hover:-translate-y-0.5 ${
-                    card
-                  } ${isDark ? 'hover:border-gold-400/40 hover:shadow-xl hover:shadow-black/20' : 'hover:border-gold-500/50 hover:shadow-lg hover:shadow-zinc-200/60'}`}
-                >
-                  <div className={`size-12 shrink-0 rounded-xl flex items-center justify-center ${
-                    isDark ? 'bg-blue-500/10' : 'bg-blue-50'
-                  }`}>
-                    <FileText className={`size-6 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className={`font-semibold ${heading}`}>{doc.title}</h3>
-                    {doc.description && (
-                      <p className={`text-sm mt-0.5 line-clamp-2 ${body}`}>{doc.description}</p>
-                    )}
-                    <p className={`text-xs mt-1 ${muted}`}>
-                      {doc.fileName} · {formatSize(doc.fileSize)}
+          <div className="grid md:grid-cols-2 gap-6 items-stretch">
+            {/* Méthode 1 — Demande en ligne */}
+            <div id="demande" className={`rounded-2xl border p-6 md:p-8 flex flex-col transition-colors duration-300 ${
+              isDark ? 'bg-space-900/80 border-space-800/60' : 'bg-white border-zinc-200 shadow-sm'
+            }`}>
+              <div className="inline-flex items-center gap-2 self-start px-3 py-1 rounded-full border mb-4 bg-gold-400/10 border-gold-400/30">
+                <span className="size-5 rounded-full bg-gradient-to-br from-gold-400 to-blue-500 text-white text-[10px] font-bold flex items-center justify-center">1</span>
+                <span className={`text-[11px] font-semibold uppercase tracking-widest ${goldText}`}>Demande en ligne</span>
+              </div>
+              <h3 className={`text-xl font-bold ${heading} mb-2`}>
+                <span className="text-gradient">Connectez-vous</span> pour faire votre demande
+              </h3>
+              <p className={`${body} text-sm leading-relaxed mb-6`}>
+                La création de demande en ligne est réservée aux utilisateurs. Identifiez-vous
+                pour accéder au formulaire : votre supérieur hiérarchique recevra un email avec
+                les boutons Valider / Refuser, et l'équipe sera notifiée de la décision.
+              </p>
+              <div className={`rounded-xl border p-6 text-center mt-auto ${
+                isDark ? 'border-space-700/60' : 'border-zinc-200'
+              }`}>
+                {user ? (
+                  <>
+                    <div className={`size-14 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                      isDark ? 'bg-gold-400/10' : 'bg-gold-50'
+                    }`}>
+                      <ShieldCheck className={`size-7 ${goldText}`} />
+                    </div>
+                    <h4 className={`font-semibold ${heading} mb-1.5`}>Vous êtes connecté</h4>
+                    <p className={`${body} text-sm mb-5`}>
+                      Vous pouvez accéder au formulaire de demande depuis l'application.
                     </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <a
-                      href={doc.fileUrl}
-                      download={doc.fileName}
-                      className={`btn text-sm ${isDark ? 'btn-ghost' : 'border border-zinc-300 bg-white text-zinc-700 hover:border-gold-500/60 hover:text-gold-600'}`}
+                    <button
+                      onClick={() => navigate('/')}
+                      className="btn btn-primary text-sm"
                     >
-                      <Download className="size-4" />
-                      Télécharger
-                    </a>
-                    {contactEmail ? (
-                      <a
-                        href={`mailto:${contactEmail}?subject=${encodeURIComponent('Formulaire rempli - ' + doc.title)}`}
-                        className="btn btn-primary text-sm"
-                      >
-                        <Mail className="size-4" />
-                        Envoyer par email
-                      </a>
-                    ) : (
-                      <span className={`text-xs ${muted}`}>Email de contact non configuré</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                      <ArrowRight className="size-4" />
+                      Accéder à l'application
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className={`size-14 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                      isDark ? 'bg-gold-400/10' : 'bg-gold-50'
+                    }`}>
+                      <LogIn className={`size-7 ${goldText}`} />
+                    </div>
+                    <h4 className={`font-semibold ${heading} mb-1.5`}>Connexion requise</h4>
+                    <p className={`${body} text-sm mb-5`}>
+                      Utilisez votre identifiant habituel pour accéder au formulaire de demande en ligne.
+                    </p>
+                    <Link
+                      to="/login"
+                      className="btn btn-primary text-sm"
+                    >
+                      <LogIn className="size-4" />
+                      Se connecter
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
-          )}
 
-          {contactEmail && (
-            <p className={`text-sm text-center mt-8 ${body}`}>
-              Pour transmettre un formulaire rempli, envoyez-le à{' '}
-              <a href={`mailto:${contactEmail}`} className={`${goldText} hover:underline font-medium`}>
-                {contactEmail}
-              </a>
-            </p>
-          )}
+            {/* Méthode 2 — Formulaire papier */}
+            <div id="formulaires" className={`rounded-2xl border p-6 md:p-8 flex flex-col scroll-mt-16 transition-colors duration-300 ${
+              isDark ? 'bg-space-900/80 border-space-800/60' : 'bg-white border-zinc-200 shadow-sm'
+            }`}>
+              <div className="inline-flex items-center gap-2 self-start px-3 py-1 rounded-full border mb-4 bg-gold-400/10 border-gold-400/30">
+                <span className="size-5 rounded-full bg-gradient-to-br from-gold-400 to-blue-500 text-white text-[10px] font-bold flex items-center justify-center">2</span>
+                <span className={`text-[11px] font-semibold uppercase tracking-widest ${goldText}`}>Formulaire papier</span>
+              </div>
+              <h3 className={`text-xl font-bold ${heading} mb-2`}>
+                Besoin d'un <span className="text-gradient">formulaire papier</span> ?
+              </h3>
+              <p className={`${body} text-sm leading-relaxed mb-6`}>
+                Téléchargez le formulaire correspondant à votre demande, imprimez-le ou remplissez-le,
+                puis transmettez-le nous par email.
+              </p>
+
+              {documents.length === 0 ? (
+                <div className={`text-center py-10 rounded-xl border border-dashed ${isDark ? 'text-zinc-500 border-space-700' : 'text-zinc-400 border-zinc-300'}`}>
+                  <FileText className="size-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm">Aucun formulaire disponible pour le moment.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center gap-3 transition-all duration-300 ${
+                        card
+                      } ${isDark ? 'hover:border-gold-400/40' : 'hover:border-gold-500/50'}`}
+                    >
+                      <div className={`size-10 shrink-0 rounded-lg flex items-center justify-center ${
+                        isDark ? 'bg-blue-500/10' : 'bg-blue-50'
+                      }`}>
+                        <FileText className={`size-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`font-semibold text-sm ${heading}`}>{doc.title}</h4>
+                        <p className={`text-xs mt-0.5 ${muted}`}>
+                          {doc.fileName} · {formatSize(doc.fileSize)}
+                        </p>
+                      </div>
+                      <a
+                        href={doc.fileUrl}
+                        download={doc.fileName}
+                        className={`btn text-sm shrink-0 ${isDark ? 'btn-ghost' : 'border border-zinc-300 bg-white text-zinc-700 hover:border-gold-500/60 hover:text-gold-600'}`}
+                      >
+                        <Download className="size-4" />
+                        Télécharger
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {contactEmail && (
+                <p className={`text-sm mt-5 pt-4 border-t ${body} ${isDark ? 'border-space-700/60' : 'border-zinc-200'}`}>
+                  Pour transmettre un formulaire rempli, envoyez-le à{' '}
+                  <a href={`mailto:${contactEmail}`} className={`${goldText} hover:underline font-medium`}>
+                    {contactEmail}
+                  </a>
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
