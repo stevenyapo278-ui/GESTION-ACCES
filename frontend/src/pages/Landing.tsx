@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   BellRing,
   PenLine,
+  X,
 } from 'lucide-react';
 import { publicRequestsAPI, documentsAPI } from '../services/api';
 import type { Document } from '../types';
@@ -34,6 +35,7 @@ const STEPS = [
 export default function Landing() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [contactEmail, setContactEmail] = useState('');
+  const [showDocs, setShowDocs] = useState(false);
   const { user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -278,35 +280,14 @@ export default function Landing() {
                   <p className="text-sm">Aucun formulaire disponible pour le moment.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {documents.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center gap-3 transition-all duration-300 ${
-                        card
-                      } ${isDark ? 'hover:border-gold-400/40' : 'hover:border-gold-500/50'}`}
-                    >
-                      <div className={`size-10 shrink-0 rounded-lg flex items-center justify-center ${
-                        isDark ? 'bg-blue-500/10' : 'bg-blue-50'
-                      }`}>
-                        <FileText className={`size-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className={`font-semibold text-sm ${heading}`}>{doc.title}</h4>
-                        <p className={`text-xs mt-0.5 ${muted}`}>
-                          {doc.fileName} · {formatSize(doc.fileSize)}
-                        </p>
-                      </div>
-                      <a
-                        href={doc.fileUrl}
-                        download={doc.fileName}
-                        className={`btn text-sm shrink-0 ${isDark ? 'btn-ghost' : 'border border-zinc-300 bg-white text-zinc-700 hover:border-gold-500/60 hover:text-gold-600'}`}
-                      >
-                        <Download className="size-4" />
-                        Télécharger
-                      </a>
-                    </div>
-                  ))}
+                <div className="mt-auto">
+                  <button
+                    onClick={() => setShowDocs(true)}
+                    className="btn btn-primary text-sm w-full sm:w-auto"
+                  >
+                    <Download className="size-4" />
+                    Télécharger un formulaire
+                  </button>
                 </div>
               )}
 
@@ -322,6 +303,68 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Modal : liste des formulaires à télécharger */}
+      {showDocs && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowDocs(false)}
+        >
+          <div
+            className="w-full max-w-lg max-h-[80vh] overflow-y-auto card p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Formulaires disponibles</h3>
+                <p className="text-sm text-zinc-500 mt-0.5">
+                  Téléchargez le formulaire correspondant à votre demande, remplissez-le puis
+                  transmettez-le nous par email.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDocs(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white"
+                title="Fermer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="rounded-xl border p-4 flex items-center gap-3"
+                  style={{ borderColor: 'var(--border-color)' }}
+                >
+                  <div className={`size-10 shrink-0 rounded-lg flex items-center justify-center ${
+                    isDark ? 'bg-blue-500/10' : 'bg-blue-50'
+                  }`}>
+                    <FileText className={`size-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{doc.title}</h4>
+                    {doc.description && (
+                      <p className="text-xs text-zinc-500 line-clamp-1">{doc.description}</p>
+                    )}
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      {doc.fileName} · {formatSize(doc.fileSize)}
+                    </p>
+                  </div>
+                  <a
+                    href={doc.fileUrl}
+                    download={doc.fileName}
+                    className="btn btn-primary text-sm shrink-0"
+                  >
+                    <Download className="size-4" />
+                    Télécharger
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className={`py-8 px-4 border-t transition-colors duration-300 ${
