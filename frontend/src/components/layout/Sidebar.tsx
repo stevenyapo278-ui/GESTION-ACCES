@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   Table2,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { publicRequestsAPI } from '../../services/api';
 import clsx from 'clsx';
 
 const navItems = [
@@ -44,6 +46,13 @@ export default function Sidebar({
 }) {
   const { user, logout, isAdmin } = useAuth();
   const { theme, toggleTheme, isDark } = useTheme();
+  const [logoUrl, setLogoUrl] = useState('');
+
+  useEffect(() => {
+    publicRequestsAPI.contact()
+      .then((res) => setLogoUrl(res.data.logoUrl || ''))
+      .catch(() => {});
+  }, []);
 
   // Non-ADMIN users only get access to the requests page
   const visibleNavItems = isAdmin ? navItems : navItems.filter((item) => item.to === '/requests');
@@ -63,9 +72,15 @@ export default function Sidebar({
             'flex items-center justify-center flex-shrink-0',
             collapsed && !isMobile ? '' : ''
           )}>
-            <div className="size-9 bg-gradient-to-br from-gold-400 to-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-gold-400/20">
-              <Database className="size-5 text-white" />
-            </div>
+            {logoUrl ? (
+              <div className="size-9 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow">
+                <img src={logoUrl} alt="Logo" className="size-full object-contain p-0.5" />
+              </div>
+            ) : (
+              <div className="size-9 bg-gradient-to-br from-gold-400 to-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-gold-400/20">
+                <Database className="size-5 text-white" />
+              </div>
+            )}
           </div>
           {(!collapsed || isMobile) && (
             <div className="min-w-0">

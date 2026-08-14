@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { EmailProvider } from '@prisma/client';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { Role } from '@prisma/client';
-import { resolveFrontendUrl, getNotificationEmail, parseEmailList, setSetting } from '../services/systemSettings';
+import { resolveFrontendUrl, getNotificationEmail, parseEmailList, setSetting, getPlatformLogo } from '../services/systemSettings';
 import { pollOnce } from '../services/replyMonitor';
 
 const router = Router();
@@ -79,6 +79,7 @@ router.get('/settings', authenticate, authorize(Role.ADMIN), async (_req: AuthRe
     res.json({
       notificationEmail: await getNotificationEmail(),
       frontendUrl: await resolveFrontendUrl(),
+      platformLogo: await getPlatformLogo(),
     });
   } catch (error) {
     console.error('Get email settings error:', error);
@@ -89,7 +90,7 @@ router.get('/settings', authenticate, authorize(Role.ADMIN), async (_req: AuthRe
 // PUT /api/email-accounts/settings — Update email-related settings (admin only)
 router.put('/settings', authenticate, authorize(Role.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
-    const { notificationEmail, frontendUrl } = req.body;
+    const { notificationEmail, frontendUrl, platformLogo } = req.body;
     if (notificationEmail !== undefined) {
       const emails = parseEmailList(String(notificationEmail));
       const raw = String(notificationEmail)
@@ -105,9 +106,13 @@ router.put('/settings', authenticate, authorize(Role.ADMIN), async (req: AuthReq
     if (frontendUrl !== undefined) {
       await setSetting('FRONTEND_URL', frontendUrl);
     }
+    if (platformLogo !== undefined) {
+      await setSetting('PLATFORM_LOGO', String(platformLogo || ''));
+    }
     res.json({
       notificationEmail: await getNotificationEmail(),
       frontendUrl: await resolveFrontendUrl(),
+      platformLogo: await getPlatformLogo(),
     });
   } catch (error) {
     console.error('Update email settings error:', error);

@@ -5,10 +5,12 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import { Menu, X } from 'lucide-react';
 import { PageTransition, ContentLoader } from '../PageTransition';
+import { publicRequestsAPI } from '../../services/api';
 
 export default function Layout() {
   const { isDark } = useTheme();
   const location = useLocation();
+  const [logoUrl, setLogoUrl] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('gestions-access-sidebar-collapsed') === 'true';
@@ -17,6 +19,12 @@ export default function Layout() {
     }
   });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    publicRequestsAPI.contact()
+      .then((res) => setLogoUrl(res.data.logoUrl || ''))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     try {
@@ -97,9 +105,15 @@ export default function Layout() {
             <Menu className="size-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="size-7 bg-gradient-to-br from-gold-400 to-blue-500 rounded-lg flex items-center justify-center">
-              <svg className="size-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7c0-2 1-3 3-3h10c2 0 3 1 3 3M4 7h16" /></svg>
-            </div>
+            {logoUrl ? (
+              <div className="size-7 rounded-lg overflow-hidden flex items-center justify-center bg-white">
+                <img src={logoUrl} alt="Logo" className="size-full object-contain p-0.5" />
+              </div>
+            ) : (
+              <div className="size-7 bg-gradient-to-br from-gold-400 to-blue-500 rounded-lg flex items-center justify-center">
+                <svg className="size-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7c0-2 1-3 3-3h10c2 0 3 1 3 3M4 7h16" /></svg>
+              </div>
+            )}
             <span className={`text-sm font-semibold ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>Gestions Access</span>
           </div>
         </div>

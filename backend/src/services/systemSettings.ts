@@ -42,3 +42,8 @@ export async function getNotificationEmails(): Promise<string[]> {
   const raw = await getNotificationEmail();
   return parseEmailList(raw);
 }
+
+// URL du logo de la plateforme (uploadé depuis la page admin "Comptes email")
+export async function getPlatformLogo(): Promise<string> {
+  return (await getSetting('PLATFORM_LOGO')) || '';
+}

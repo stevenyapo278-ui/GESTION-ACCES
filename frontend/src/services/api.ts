@@ -264,7 +264,7 @@ export const requestsAPI = {
 
 // === Public Requests API (no auth — from landing page) ===
 export const publicRequestsAPI = {
-  contact: () => axios.get('/api/requests/public/contact'),
+  contact: () => axios.get<{ notificationEmail: string; logoUrl: string }>('/api/requests/public/contact'),
 };
 
 // === Email Accounts API ===
@@ -275,8 +275,8 @@ export const emailAccountsAPI = {
   delete: (id: string) => api.delete(`/email-accounts/${id}`),
   oauthConnect: (id: string) => api.get(`/email-accounts/${id}/oauth/connect`),
   settings: {
-    get: () => api.get('/email-accounts/settings'),
-    update: (data: { notificationEmail?: string; frontendUrl?: string }) =>
+    get: () => api.get<{ notificationEmail: string; frontendUrl: string; platformLogo: string }>('/email-accounts/settings'),
+    update: (data: { notificationEmail?: string; frontendUrl?: string; platformLogo?: string }) =>
       api.put('/email-accounts/settings', data),
   },
 };

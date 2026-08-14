@@ -3,7 +3,7 @@ import { Router, Request, Response } from 'express';
 import { RequestStatus, Role } from '@prisma/client';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { sendRequestToSuperior, sendRequestDecisionToAdmin, sendRequestDecisionToRequester } from '../services/emailSender';
-import { getNotificationEmail } from '../services/systemSettings';
+import { getNotificationEmail, getPlatformLogo } from '../services/systemSettings';
 import { displayName } from '../services/requestData';
 
 const router = Router();
@@ -176,9 +176,9 @@ router.get('/types/public', async (_req: Request, res: Response) => {
 router.get('/public/contact', async (_req: Request, res: Response) => {
   try {
     const notificationEmail = await getNotificationEmail();
-    res.json({ notificationEmail: notificationEmail || '' });
+    res.json({ notificationEmail: notificationEmail || '', logoUrl: await getPlatformLogo() });
   } catch (error) {
-    console.error('Get public contact email error:', error);
+    console.error('Get public contact error:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

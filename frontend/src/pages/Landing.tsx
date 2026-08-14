@@ -35,6 +35,7 @@ const STEPS = [
 export default function Landing() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [contactEmail, setContactEmail] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
   const [showDocs, setShowDocs] = useState(false);
   const { user } = useAuth();
   const { isDark, toggleTheme } = useTheme();
@@ -45,7 +46,10 @@ export default function Landing() {
       .then((res) => setDocuments(res.data))
       .catch(() => {});
     publicRequestsAPI.contact()
-      .then((res) => setContactEmail(res.data.notificationEmail || ''))
+      .then((res) => {
+        setContactEmail(res.data.notificationEmail || '');
+        setLogoUrl(res.data.logoUrl || '');
+      })
       .catch(() => {});
   }, []);
 
@@ -67,9 +71,15 @@ export default function Landing() {
       }`}>
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="size-10 bg-gradient-to-br from-gold-400 to-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-gold-400/20">
-              <Database className="size-5 text-white" />
-            </div>
+            {logoUrl ? (
+              <div className="size-10 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow">
+                <img src={logoUrl} alt="Logo" className="size-full object-contain p-0.5" />
+              </div>
+            ) : (
+              <div className="size-10 bg-gradient-to-br from-gold-400 to-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-gold-400/20">
+                <Database className="size-5 text-white" />
+              </div>
+            )}
             <span className={`text-lg font-bold ${heading}`}>Gestions Access</span>
           </div>
           <div className="flex items-center gap-2">

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
-import { Plus, Loader2, Pencil, Trash2, Link2, Mail, ToggleRight, ToggleLeft, CheckCircle2, AlertCircle } from 'lucide-react';
-import { emailAccountsAPI } from '../services/api';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Loader2, Pencil, Trash2, Link2, Mail, ToggleRight, ToggleLeft, CheckCircle2, AlertCircle, ImageIcon, X } from 'lucide-react';
+import { emailAccountsAPI, uploadAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
 interface EmailAccount {
@@ -35,25 +35,44 @@ export default function EmailAccounts() {
   const [form, setForm] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<EmailAccount | null>(null);
   const [editForm, setEditForm] = useState<Record<string, string>>({});
-  const [settings, setSettings] = useState({ notificationEmail: '', frontendUrl: '' });
+  const [settings, setSettings] = useState({ notificationEmail: '', frontendUrl: '', platformLogo: '' });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const { data: accounts, isLoading } = useQuery<EmailAccount[]>({
     queryKey: ['email-accounts'],
     queryFn: async () => (await emailAccountsAPI.list()).data,
   });
 
-  const { data: settingsData } = useQuery<{ notificationEmail: string; frontendUrl: string }>({
+  const { data: settingsData } = useQuery<{ notificationEmail: string; frontendUrl: string; platformLogo: string }>({
     queryKey: ['email-settings'],
     queryFn: async () => (await emailAccountsAPI.settings.get()).data,
   });
 
   useEffect(() => {
     if (settingsData && !settingsLoaded) {
-      setSettings({ notificationEmail: settingsData.notificationEmail || '', frontendUrl: settingsData.frontendUrl || '' });
+      setSettings({
+        notificationEmail: settingsData.notificationEmail || '',
+        frontendUrl: settingsData.frontendUrl || '',
+        platformLogo: settingsData.platformLogo || '',
+      });
       setSettingsLoaded(true);
     }
   }, [settingsData, settingsLoaded]);
+
+  const uploadLogo = async (file: File) => {
+    setLogoBusy(true);
+    try {
+      const res = await uploadAPI.upload(file);
+      setSettings((prev) => ({ ...prev, platformLogo: res.data.fileUrl }));
+      toast.success('Logo téléchargé — enregistrez les réglages pour l\'appliquer');
+    } catch {
+      toast.error('Échec du téléchargement du logo');
+    } finally {
+      setLogoBusy(false);
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: (data: any) => emailAccountsAPI.create(data),
@@ -422,7 +441,7 @@ export default function EmailAccounts() {
 
       <div className="card p-5">
         <h3 className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Réglages email</h3>
-        <p className="text-xs text-zinc-500 mb-4">Adresses qui reçoivent les décisions, et URL publique de l'application (liens de validation).</p>
+        <p className="text-xs text-zinc-500 mb-4">Adresses qui reçoivent les décisions, URL publique de l'application (liens de validation) et logo de la plateforme.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="label">Adresses qui reçoivent les décisions</label>
@@ -444,6 +463,65 @@ export default function EmailAccounts() {
           {settingsMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
           Enregistrer les réglages
         </button>
+      </div>
+
+      <div className="card p-5">
+        <h3 className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Logo de la plateforme</h3>
+        <p className="text-xs text-zinc-500 mb-4">Affiché sur la page de connexion, la page d'accueil et dans l'application. PNG ou JPG recommandé.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="size-20 shrink-0 rounded-2xl border flex items-center justify-center overflow-hidden"
+            style={{ borderColor: 'var(--border-color)', background: 'var(--bg-secondary)' }}>
+            {settings.platformLogo ? (
+              <img src={settings.platformLogo} alt="Logo" className="size-full object-contain p-1.5" />
+            ) : (
+              <ImageIcon className="size-7 text-zinc-500" />
+            )}
+          </div>
+          <div className="flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => logoInputRef.current?.click()}
+                disabled={logoBusy}
+                className="btn-primary !py-2 cursor-pointer disabled:opacity-50"
+              >
+                {logoBusy ? <Loader2 className="size-4 animate-spin" /> : <ImageIcon className="size-4" />}
+                {settings.platformLogo ? 'Remplacer le logo' : 'Téléverser un logo'}
+              </button>
+              {settings.platformLogo && (
+                <button
+                  onClick={() => setSettings({ ...settings, platformLogo: '' })}
+                  className="btn-secondary !py-2 cursor-pointer"
+                >
+                  <X className="size-4" />
+                  Retirer
+                </button>
+              )}
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadLogo(file);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Link2 className="size-4 text-zinc-500 shrink-0" />
+              <input
+                className="input"
+                placeholder="…ou collez une URL directe d'image"
+                value={settings.platformLogo}
+                onChange={(e) => setSettings({ ...settings, platformLogo: e.target.value })}
+              />
+            </div>
+            {settings.platformLogo !== (settingsData?.platformLogo || '') && (
+              <p className="text-xs text-amber-400">Modification non enregistrée — cliquez sur « Enregistrer les réglages » ci-dessus.</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
